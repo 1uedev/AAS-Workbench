@@ -20,8 +20,8 @@
   - Runs imported data through the existing validator and explorer
 - Added CSV import with mapping dialog.
 - Added Excel `.xlsx` import with mapping dialog.
-- Added manual AAS generator form.
-- Added basic AAS validation:
+- Added manual AAS generator MVP.
+- Added AAS validator MVP:
   - Package arrays
   - Required IDs
   - `idShort` format
@@ -38,8 +38,8 @@
   - `aasx/aasx-origin`
   - `aasx/_rels/aasx-origin.rels`
   - `aasx/data.json`
-- Added OPC UA / MQTT gateway mapping form.
-- Added `GatewayMapping` Submodel generation.
+- Added OPC UA / MQTT gateway mapping MVP.
+- Added `GatewayMapping` Submodel generation for exportable gateway configuration.
 - Added sample CSV data.
 - Added README with setup and route documentation.
 - Pushed initial code to GitHub:

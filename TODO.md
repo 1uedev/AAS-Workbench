@@ -13,7 +13,7 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 - [ ] Add export to PDF.
 - [ ] Add export to Excel.
 
-## AAS Validator
+## Validator Enhancements
 
 - [ ] Add validation against AAS Metamodel 3.x.
 - [ ] Add severity levels and validation categories.
@@ -23,7 +23,7 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 - [ ] Check units more deeply.
 - [ ] Add machine-readable validation report export.
 
-## AAS Generator
+## Generator Enhancements
 
 - [ ] Add reusable Submodel templates.
 - [ ] Add multi-property manual entry.
@@ -47,7 +47,7 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 - [ ] Add saved dashboard layouts.
 - [ ] Add live value display once gateway backend exists.
 
-## AAS-to-OPC-UA / MQTT Gateway
+## Live OPC UA / MQTT Gateway Backend
 
 - [ ] Build backend service for OPC UA connections.
 - [ ] Build backend service for MQTT subscriptions.
