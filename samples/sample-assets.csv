@@ -1,0 +1,5 @@
+assetId,assetName,submodelId,submodelName,idShort,valueType,value,semanticId,unit
+urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:TechnicalData,Technical Data,Manufacturer,string,ACME Industrial,https://admin-shell.io/idta/Manufacturer,
+urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:TechnicalData,Technical Data,NominalPower,double,7.5,https://admin-shell.io/idta/NominalPower,kW
+urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:OperationalData,Operational Data,OperatingHours,integer,1840,https://admin-shell.io/idta/OperatingHours,h
+urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:OperationalData,Operational Data,Status,string,Running,https://admin-shell.io/idta/Status,

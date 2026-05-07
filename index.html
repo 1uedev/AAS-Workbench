@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AAS Workbench</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-route="home">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Asset Administration Shell</p>
+        <h1>AAS Workbench</h1>
+      </div>
+      <nav class="main-nav" aria-label="Hauptnavigation">
+        <a href="#home" data-route-link="home">Home</a>
+        <a href="#import" data-route-link="import">Import</a>
+        <a href="#generator" data-route-link="generator">Generator</a>
+        <a href="#gateway" data-route-link="gateway">Gateway</a>
+        <a href="#explorer" data-route-link="explorer">Explorer</a>
+      </nav>
+      <div class="header-actions">
+        <button id="loadSampleButton" class="secondary-button" type="button">Beispiel laden</button>
+        <button id="downloadButton" class="primary-button" type="button" disabled>JSON exportieren</button>
+        <button id="downloadAasxButton" class="primary-button" type="button" disabled>AASX exportieren</button>
+      </div>
+    </header>
+
+    <main id="homePage" class="home-page">
+      <section class="home-intro" aria-labelledby="home-title">
+        <p class="eyebrow">Workbench</p>
+        <h2 id="home-title">AAS-Daten erzeugen, prüfen, mappen und exportieren</h2>
+      </section>
+      <section class="feature-grid" aria-label="Funktionen">
+        <a class="feature-card" href="#import">
+          <span class="feature-kicker">Import</span>
+          <strong>AAS-JSON, Excel oder CSV prüfen</strong>
+          <span>Tabellen per Mapping-Dialog in eine AAS-Struktur ueberfuehren.</span>
+        </a>
+        <a class="feature-card" href="#generator">
+          <span class="feature-kicker">Generator</span>
+          <strong>AAS manuell erzeugen</strong>
+          <span>Asset, Submodel und Property direkt aus Formularfeldern erstellen.</span>
+        </a>
+        <a class="feature-card" href="#gateway">
+          <span class="feature-kicker">Gateway</span>
+          <strong>OPC UA / MQTT Mapping</strong>
+          <span>Gateway-Konfiguration als exportierbares AAS-Submodel ablegen.</span>
+        </a>
+        <a class="feature-card" href="#explorer">
+          <span class="feature-kicker">Explorer</span>
+          <strong>Validieren und durchsuchen</strong>
+          <span>AAS-Struktur, Issues, Submodels und Properties inspizieren.</span>
+        </a>
+      </section>
+    </main>
+
+    <main class="app-shell">
+      <section class="workspace-panel import-panel" data-panel="import" aria-labelledby="import-title">
+        <div class="section-heading">
+          <p class="eyebrow">Import</p>
+          <h2 id="import-title">AAS-JSON, Excel oder CSV prüfen</h2>
+        </div>
+
+        <label class="drop-zone" for="fileInput">
+          <input id="fileInput" type="file" accept=".json,.csv,.xlsx,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+          <span class="drop-title">Datei auswählen</span>
+          <span class="drop-copy">Unterstützt AAS-JSON, Excel und CSV mit frei zuordenbaren Spalten.</span>
+        </label>
+
+        <div class="format-box">
+          <h3>Zielspalten</h3>
+          <p>assetId, assetName, submodelId, submodelName, idShort, valueType, value, semanticId, unit</p>
+        </div>
+      </section>
+
+      <section class="workspace-panel status-panel" data-panel="status" aria-labelledby="status-title">
+        <div class="section-heading">
+          <p class="eyebrow">Qualität</p>
+          <h2 id="status-title">Validierung</h2>
+        </div>
+        <div class="score-row">
+          <div>
+            <span id="statusLabel" class="status-pill neutral">Keine Datei</span>
+            <p id="summaryText" class="summary-text">Lade eine Datei, um Struktur, Referenzen und Pflichtfelder zu prüfen.</p>
+          </div>
+          <div id="stats" class="stats-grid" aria-label="AAS Kennzahlen">
+            <div><strong>0</strong><span>AAS</span></div>
+            <div><strong>0</strong><span>Submodels</span></div>
+            <div><strong>0</strong><span>Elements</span></div>
+          </div>
+        </div>
+        <div id="issuesList" class="issues-list"></div>
+      </section>
+
+      <section class="workspace-panel generator-panel" data-panel="generator" aria-labelledby="generator-title">
+        <div class="section-heading">
+          <p class="eyebrow">Generator</p>
+          <h2 id="generator-title">AAS manuell erzeugen</h2>
+        </div>
+        <form id="manualGeneratorForm" class="tool-form">
+          <div class="form-grid">
+            <label class="field">
+              <span>Asset ID</span>
+              <input name="assetId" required placeholder="urn:example:asset:Pump-001" />
+            </label>
+            <label class="field">
+              <span>Asset Name</span>
+              <input name="assetName" required placeholder="Pump 001" />
+            </label>
+            <label class="field">
+              <span>Submodel ID</span>
+              <input name="submodelId" required placeholder="urn:example:submodel:Pump-001:TechnicalData" />
+            </label>
+            <label class="field">
+              <span>Submodel Name</span>
+              <input name="submodelName" required placeholder="Technical Data" />
+            </label>
+            <label class="field">
+              <span>Property idShort</span>
+              <input name="idShort" required placeholder="NominalPower" />
+            </label>
+            <label class="field">
+              <span>Value Type</span>
+              <select name="valueType" required>
+                <option value="string">string</option>
+                <option value="double">double</option>
+                <option value="integer">integer</option>
+                <option value="boolean">boolean</option>
+                <option value="date">date</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Value</span>
+              <input name="value" required placeholder="7.5" />
+            </label>
+            <label class="field">
+              <span>Semantic ID</span>
+              <input name="semanticId" placeholder="https://admin-shell.io/idta/NominalPower" />
+            </label>
+            <label class="field">
+              <span>Unit</span>
+              <input name="unit" placeholder="kW" />
+            </label>
+          </div>
+          <div class="action-row">
+            <button class="primary-button" type="submit">AAS erzeugen</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="workspace-panel gateway-panel" data-panel="gateway" aria-labelledby="gateway-title">
+        <div class="section-heading">
+          <p class="eyebrow">Gateway</p>
+          <h2 id="gateway-title">OPC UA / MQTT Mapping</h2>
+        </div>
+        <form id="gatewayForm" class="tool-form">
+          <div class="form-grid">
+            <label class="field">
+              <span>Protokoll</span>
+              <select name="protocol" required>
+                <option value="OPC UA">OPC UA</option>
+                <option value="MQTT">MQTT</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Endpoint / Broker</span>
+              <input name="endpoint" required placeholder="opc.tcp://localhost:4840 oder mqtt://broker:1883" />
+            </label>
+            <label class="field">
+              <span>Node ID / Topic</span>
+              <input name="sourceAddress" required placeholder="ns=2;s=Pump.Power oder factory/pump/power" />
+            </label>
+            <label class="field">
+              <span>Ziel-Property</span>
+              <input name="targetProperty" required placeholder="NominalPower" />
+            </label>
+            <label class="field">
+              <span>Sampling ms</span>
+              <input name="samplingInterval" required type="number" min="100" step="100" value="1000" />
+            </label>
+          </div>
+          <div class="action-row">
+            <button class="secondary-button" type="submit">Mapping-Submodel hinzufügen</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="workspace-panel explorer-panel" data-panel="explorer" aria-labelledby="explorer-title">
+        <div class="section-heading">
+          <p class="eyebrow">Explorer</p>
+          <h2 id="explorer-title">Struktur</h2>
+        </div>
+        <div class="toolbar">
+          <input id="searchInput" type="search" placeholder="Suchen nach idShort, ID, Semantic ID oder Wert" />
+        </div>
+        <div id="explorer" class="explorer-empty">Noch keine AAS geladen.</div>
+      </section>
+    </main>
+
+    <dialog id="mappingDialog" class="mapping-dialog">
+      <form id="mappingForm" method="dialog">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Mapping</p>
+            <h2>Spalten zuordnen</h2>
+          </div>
+          <button id="closeMappingButton" class="icon-button" type="button" aria-label="Dialog schliessen">x</button>
+        </div>
+        <p id="mappingSummary" class="summary-text"></p>
+        <div id="mappingFields" class="mapping-fields"></div>
+        <div class="preview-table-wrap">
+          <table id="mappingPreview" class="preview-table"></table>
+        </div>
+        <div class="dialog-actions">
+          <button class="secondary-button" type="button" id="cancelMappingButton">Abbrechen</button>
+          <button class="primary-button" type="submit">AAS erzeugen</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>
