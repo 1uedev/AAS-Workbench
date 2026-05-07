@@ -1,4 +1,5 @@
 import { createAasxBlob } from "./aasx-export.js";
+import { readAasxPackage } from "./aasx-import.js";
 
 const fileInput = document.querySelector("#fileInput");
 const loadSampleButton = document.querySelector("#loadSampleButton");
@@ -59,8 +60,12 @@ fileInput.addEventListener("change", async (event) => {
       openMappingDialog(parseCsv(await file.text()), "CSV-Datei");
     } else if (lowerName.endsWith(".xlsx")) {
       openMappingDialog(await parseXlsx(await file.arrayBuffer()), "Excel-Datei");
+    } else if (lowerName.endsWith(".aasx")) {
+      loadPackage(normalizeAasJson(await readAasxPackage(await file.arrayBuffer())));
+      navigateTo("explorer");
     } else {
       loadPackage(normalizeAasJson(JSON.parse(await file.text())));
+      navigateTo("explorer");
     }
   } catch (error) {
     renderError(error);
@@ -461,8 +466,8 @@ function detectDelimiter(text) {
 
 async function parseXlsx(buffer) {
   const entries = await readZipEntries(buffer);
-  const workbook = parseXml(readTextEntry(entries, "xl/workbook.xml"));
-  const rels = parseRelationships(readTextEntry(entries, "xl/_rels/workbook.xml.rels"));
+  const workbook = parseXml(readTextEntry(entries, "xl/workbook.xml", "Excel-Datei"));
+  const rels = parseRelationships(readTextEntry(entries, "xl/_rels/workbook.xml.rels", "Excel-Datei"));
   const firstSheet = [...workbook.getElementsByTagNameNS("*", "sheet")][0];
   if (!firstSheet) throw new Error("Die Excel-Datei enthält kein Worksheet.");
 
@@ -472,9 +477,9 @@ async function parseXlsx(buffer) {
 
   const sheetPath = resolveZipPath("xl/workbook.xml", target);
   const sharedStrings = entries.has("xl/sharedStrings.xml")
-    ? parseSharedStrings(readTextEntry(entries, "xl/sharedStrings.xml"))
+    ? parseSharedStrings(readTextEntry(entries, "xl/sharedStrings.xml", "Excel-Datei"))
     : [];
-  return parseWorksheet(readTextEntry(entries, sheetPath), sharedStrings);
+  return parseWorksheet(readTextEntry(entries, sheetPath, "Excel-Datei"), sharedStrings);
 }
 
 async function readZipEntries(buffer) {
@@ -517,7 +522,7 @@ function findEndOfCentralDirectory(view) {
   for (let offset = view.byteLength - 22; offset >= minOffset; offset -= 1) {
     if (view.getUint32(offset, true) === 0x06054b50) return offset;
   }
-  throw new Error("Die Excel-Datei konnte nicht als ZIP gelesen werden.");
+  throw new Error("Die Datei konnte nicht als ZIP/OPC-Package gelesen werden.");
 }
 
 async function inflateZipEntry(bytes, compressionMethod) {
@@ -526,7 +531,7 @@ async function inflateZipEntry(bytes, compressionMethod) {
   }
 
   if (!("DecompressionStream" in window)) {
-    throw new Error("Dieser Browser kann komprimierte Excel-Dateien nicht entpacken.");
+    throw new Error("Dieser Browser kann komprimierte ZIP/OPC-Dateien nicht entpacken.");
   }
 
   const formats = ["deflate-raw", "deflate"];
@@ -539,18 +544,18 @@ async function inflateZipEntry(bytes, compressionMethod) {
     }
   }
 
-  throw new Error("Excel-ZIP-Eintrag konnte nicht entpackt werden.");
+  throw new Error("ZIP/OPC-Eintrag konnte nicht entpackt werden.");
 }
 
-function readTextEntry(entries, path) {
+function readTextEntry(entries, path, packageLabel = "Datei") {
   const entry = entries.get(path);
-  if (!entry) throw new Error(`Excel-Datei enthaelt ${path} nicht.`);
+  if (!entry) throw new Error(`${packageLabel} enthaelt ${path} nicht.`);
   return new TextDecoder().decode(entry);
 }
 
 function parseXml(text) {
   const document = new DOMParser().parseFromString(text, "application/xml");
-  if (document.querySelector("parsererror")) throw new Error("XML in der Excel-Datei ist ungueltig.");
+  if (document.querySelector("parsererror")) throw new Error("XML in der Datei ist ungueltig.");
   return document;
 }
 
@@ -564,7 +569,7 @@ function parseRelationships(xmlText) {
 }
 
 function resolveZipPath(basePath, target) {
-  if (target.startsWith("/")) return target.slice(1);
+  if (target.startsWith("/")) return normalizeZipPath(target);
   const parts = basePath.split("/");
   parts.pop();
   for (const segment of target.split("/")) {

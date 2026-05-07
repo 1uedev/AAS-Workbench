@@ -11,6 +11,13 @@
   - `#gateway`
   - `#explorer`
 - Added AAS JSON import.
+- Added `.aasx` import:
+  - Reads OPC/ZIP package contents
+  - Resolves `/_rels/.rels`
+  - Follows the `aasx-origin` relationship
+  - Resolves `aasx/_rels/aasx-origin.rels`
+  - Loads JSON AAS data referenced by the `aas-spec` relationship
+  - Runs imported data through the existing validator and explorer
 - Added CSV import with mapping dialog.
 - Added Excel `.xlsx` import with mapping dialog.
 - Added manual AAS generator form.
@@ -44,6 +51,7 @@
 
 - `node --check app.js`
 - `node --check aasx-export.js`
+- `node --check aasx-import.js`
 - Browser smoke tests for:
   - Home route
   - Subpage navigation
@@ -53,3 +61,4 @@
   - JSON/AASX export button states
   - AASX export click without console errors
 - Local `.aasx` package generated and inspected with `unzip -l`.
+- AASX export/import roundtrip tested in Node with matching AAS structure.

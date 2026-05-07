@@ -4,18 +4,11 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Implement `.aasx` import.
-- [ ] Read OPC/ZIP package contents.
-- [ ] Resolve `/_rels/.rels`.
-- [ ] Follow the `aasx-origin` relationship.
-- [ ] Resolve `aasx/_rels/aasx-origin.rels`.
-- [ ] Load `aasx/data.json`.
-- [ ] Run the existing validator and explorer on imported `.aasx` data.
+- [ ] Improve tree navigation for AAS, Submodels and Submodel Elements.
+- [ ] Add side-by-side JSON inspector.
 
 ## AAS Explorer / Viewer
 
-- [ ] Improve tree navigation for AAS, Submodels and Submodel Elements.
-- [ ] Add side-by-side JSON inspector.
 - [ ] Add compare view for two AAS versions.
 - [ ] Add export to PDF.
 - [ ] Add export to Excel.

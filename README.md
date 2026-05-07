@@ -5,7 +5,7 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 ## Funktionen
 
 - Hauptseite mit Unterseiten fuer Import, Generator, Gateway und Explorer
-- AAS-JSON laden und prüfen
+- AASX und AAS-JSON laden und prüfen
 - AAS manuell über ein Generator-Formular erzeugen
 - CSV- und Excel-Dateien (`.xlsx`) mit Mapping-Dialog in eine einfache AAS-Struktur umwandeln
 - OPC-UA- und MQTT-Quellen als Gateway-Mapping-Submodel dokumentieren
@@ -14,6 +14,8 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 - Ergebnis als JSON oder `.aasx` exportieren
 
 ## AASX-Export
+
+Der `.aasx`-Import liest einen OPC/ZIP-Container, folgt der `aasx-origin` Relationship und lädt die per `aas-spec` referenzierte JSON-Datei.
 
 Der `.aasx`-Export erzeugt einen echten OPC/ZIP-Container mit dieser Struktur:
 
@@ -74,7 +76,6 @@ Siehe [samples/sample-assets.csv](samples/sample-assets.csv).
 
 ## Nächste sinnvolle Ausbaustufen
 
-- `.aasx` Import
 - Live-Gateway-Backend fuer OPC UA und MQTT
 - Validierung gegen AAS-Metamodell 3.x
 - Submodel-Template-Katalog
