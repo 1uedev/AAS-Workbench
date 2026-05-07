@@ -1,0 +1,231 @@
+{
+  "assetAdministrationShells": [
+    {
+      "modelType": "AssetAdministrationShell",
+      "id": "urn:aas:acme:line-a:robot-loader-01",
+      "idShort": "RobotLoader01AAS",
+      "assetInformation": {
+        "assetKind": "Instance",
+        "globalAssetId": "urn:asset:acme:line-a:robot-loader-01"
+      },
+      "submodels": [
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:robot-loader-01:technical-data"
+            }
+          ]
+        },
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:robot-loader-01:operational-data"
+            }
+          ]
+        },
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:robot-loader-01:gateway-mapping"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "submodels": [
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:robot-loader-01:technical-data",
+      "idShort": "TechnicalData",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "Manufacturer",
+          "valueType": "xs:string",
+          "value": "KUKA",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/Manufacturer"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "Model",
+          "valueType": "xs:string",
+          "value": "KR 60-3",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/Model"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "Payload",
+          "valueType": "xs:double",
+          "value": "60",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/robotics/Payload"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "kg"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "Reach",
+          "valueType": "xs:integer",
+          "value": "2033",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/robotics/Reach"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "mm"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:robot-loader-01:operational-data",
+      "idShort": "OperationalData",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "RobotMode",
+          "valueType": "xs:string",
+          "value": "Automatic",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/robotics/RobotMode"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "CycleTime",
+          "valueType": "xs:double",
+          "value": "18.7",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/manufacturing/CycleTime"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "s"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "PartsHandledToday",
+          "valueType": "xs:integer",
+          "value": "1260",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/manufacturing/PartsHandledToday"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:robot-loader-01:gateway-mapping",
+      "idShort": "GatewayMapping",
+      "submodelElements": [
+        {
+          "modelType": "SubmodelElementCollection",
+          "idShort": "Mapping1",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/GatewayMappingEntry"
+              }
+            ]
+          },
+          "value": [
+            {
+              "modelType": "Property",
+              "idShort": "Protocol",
+              "valueType": "xs:string",
+              "value": "OPC UA"
+            },
+            {
+              "modelType": "Property",
+              "idShort": "Endpoint",
+              "valueType": "xs:string",
+              "value": "opc.tcp://plc-line-a.local:4840"
+            },
+            {
+              "modelType": "Property",
+              "idShort": "SourceAddress",
+              "valueType": "xs:string",
+              "value": "ns=4;s=RobotLoader01.CycleTime"
+            },
+            {
+              "modelType": "Property",
+              "idShort": "TargetProperty",
+              "valueType": "xs:string",
+              "value": "CycleTime"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "conceptDescriptions": []
+}

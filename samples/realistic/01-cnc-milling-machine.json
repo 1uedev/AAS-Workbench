@@ -1,0 +1,305 @@
+{
+  "assetAdministrationShells": [
+    {
+      "modelType": "AssetAdministrationShell",
+      "id": "urn:aas:acme:line-a:cnc-mill-01",
+      "idShort": "CncMill01AAS",
+      "assetInformation": {
+        "assetKind": "Instance",
+        "globalAssetId": "urn:asset:acme:line-a:cnc-mill-01"
+      },
+      "submodels": [
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:cnc-mill-01:technical-data"
+            }
+          ]
+        },
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:cnc-mill-01:operational-data"
+            }
+          ]
+        },
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:cnc-mill-01:maintenance"
+            }
+          ]
+        },
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:cnc-mill-01:line-assignment"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "submodels": [
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:cnc-mill-01:technical-data",
+      "idShort": "TechnicalData",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "Manufacturer",
+          "valueType": "xs:string",
+          "value": "DMG MORI",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/Manufacturer"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "Model",
+          "valueType": "xs:string",
+          "value": "DMU 50",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/Model"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "SerialNumber",
+          "valueType": "xs:string",
+          "value": "DMU50-2024-11742",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/SerialNumber"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "SpindlePower",
+          "valueType": "xs:double",
+          "value": "35",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/manufacturing/SpindlePower"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "kW"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:cnc-mill-01:operational-data",
+      "idShort": "OperationalData",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "MachineState",
+          "valueType": "xs:string",
+          "value": "Producing",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/manufacturing/MachineState"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "CurrentProgram",
+          "valueType": "xs:string",
+          "value": "HOUSING_OP20_REV_C",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/manufacturing/CurrentProgram"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "OperatingHours",
+          "valueType": "xs:integer",
+          "value": "12840",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/OperatingHours"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "h"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "SpindleLoad",
+          "valueType": "xs:double",
+          "value": "72.4",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/manufacturing/SpindleLoad"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "%"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:cnc-mill-01:maintenance",
+      "idShort": "Maintenance",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "LastServiceDate",
+          "valueType": "xs:date",
+          "value": "2026-04-18",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/maintenance/LastServiceDate"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "NextToolChangeIn",
+          "valueType": "xs:integer",
+          "value": "430",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/maintenance/NextToolChangeIn"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "parts"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:cnc-mill-01:line-assignment",
+      "idShort": "LineAssignment",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "Plant",
+          "valueType": "xs:string",
+          "value": "Plant Regensburg",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/factory/Plant"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "ProductionLine",
+          "valueType": "xs:string",
+          "value": "LINE_A_HOUSING",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/factory/ProductionLine"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "Cell",
+          "valueType": "xs:string",
+          "value": "CELL_10_MACHINING",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/factory/Cell"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "conceptDescriptions": []
+}

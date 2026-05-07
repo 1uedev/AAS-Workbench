@@ -1,0 +1,169 @@
+{
+  "assetAdministrationShells": [
+    {
+      "modelType": "AssetAdministrationShell",
+      "id": "urn:aas:acme:line-a:vision-inspection-01",
+      "idShort": "VisionInspection01AAS",
+      "assetInformation": {
+        "assetKind": "Instance",
+        "globalAssetId": "urn:asset:acme:line-a:vision-inspection-01"
+      },
+      "submodels": [
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:vision-inspection-01:technical-data"
+            }
+          ]
+        },
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:vision-inspection-01:quality-data"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "submodels": [
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:vision-inspection-01:technical-data",
+      "idShort": "TechnicalData",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "Manufacturer",
+          "valueType": "xs:string",
+          "value": "Cognex",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/Manufacturer"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "CameraModel",
+          "valueType": "xs:string",
+          "value": "In-Sight 7905",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/vision/CameraModel"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "Resolution",
+          "valueType": "xs:string",
+          "value": "2448x2048",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/vision/Resolution"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:vision-inspection-01:quality-data",
+      "idShort": "QualityData",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "InspectionRecipe",
+          "valueType": "xs:string",
+          "value": "HOUSING_FINAL_REV_08",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/quality/InspectionRecipe"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "PassRateShift",
+          "valueType": "xs:double",
+          "value": "98.7",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/quality/PassRate"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "%"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "RejectCountShift",
+          "valueType": "xs:integer",
+          "value": "17",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/quality/RejectCount"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "parts"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "LastRejectReason",
+          "valueType": "xs:string",
+          "value": "Thread chamfer out of tolerance",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/quality/RejectReason"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "conceptDescriptions": []
+}

@@ -1,0 +1,176 @@
+{
+  "assetAdministrationShells": [
+    {
+      "modelType": "AssetAdministrationShell",
+      "id": "urn:aas:acme:line-a:energy-meter-01",
+      "idShort": "EnergyMeter01AAS",
+      "assetInformation": {
+        "assetKind": "Instance",
+        "globalAssetId": "urn:asset:acme:line-a:energy-meter-01"
+      },
+      "submodels": [
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:energy-meter-01:technical-data"
+            }
+          ]
+        },
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:energy-meter-01:energy-data"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "submodels": [
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:energy-meter-01:technical-data",
+      "idShort": "TechnicalData",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "Manufacturer",
+          "valueType": "xs:string",
+          "value": "Siemens",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/Manufacturer"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "Model",
+          "valueType": "xs:string",
+          "value": "SENTRON PAC3200",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/Model"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "MeasurementPoint",
+          "valueType": "xs:string",
+          "value": "LINE_A_MAIN_FEEDER",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/energy/MeasurementPoint"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:energy-meter-01:energy-data",
+      "idShort": "EnergyData",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "CurrentPower",
+          "valueType": "xs:double",
+          "value": "82.6",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/energy/CurrentPower"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "kW"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "EnergyToday",
+          "valueType": "xs:double",
+          "value": "614.8",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/energy/EnergyToday"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "kWh"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "EnergyPerPart",
+          "valueType": "xs:double",
+          "value": "0.49",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/energy/EnergyPerPart"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "kWh/part"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "ProductionLine",
+          "valueType": "xs:string",
+          "value": "LINE_A_HOUSING",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/factory/ProductionLine"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "conceptDescriptions": []
+}

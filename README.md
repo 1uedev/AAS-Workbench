@@ -74,6 +74,16 @@ assetId, assetName, submodelId, submodelName, idShort, valueType, value
 
 Siehe [samples/sample-assets.csv](samples/sample-assets.csv).
 
+Weitere realistische Beispieldaten liegen unter [samples/realistic](samples/realistic):
+
+- CNC milling machine
+- Robot loading cell
+- Conveyor transfer system
+- Vision inspection station
+- Line energy meter
+
+Jedes Beispiel ist als `.json` und als importierbares `.aasx` vorhanden.
+
 ## Nächste sinnvolle Ausbaustufen
 
 - Live-Gateway-Backend fuer OPC UA und MQTT

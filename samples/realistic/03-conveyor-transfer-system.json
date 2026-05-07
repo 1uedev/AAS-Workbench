@@ -1,0 +1,183 @@
+{
+  "assetAdministrationShells": [
+    {
+      "modelType": "AssetAdministrationShell",
+      "id": "urn:aas:acme:line-a:conveyor-transfer-01",
+      "idShort": "ConveyorTransfer01AAS",
+      "assetInformation": {
+        "assetKind": "Instance",
+        "globalAssetId": "urn:asset:acme:line-a:conveyor-transfer-01"
+      },
+      "submodels": [
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:conveyor-transfer-01:technical-data"
+            }
+          ]
+        },
+        {
+          "type": "ExternalReference",
+          "keys": [
+            {
+              "type": "Submodel",
+              "value": "urn:submodel:acme:line-a:conveyor-transfer-01:operational-data"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "submodels": [
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:conveyor-transfer-01:technical-data",
+      "idShort": "TechnicalData",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "Manufacturer",
+          "valueType": "xs:string",
+          "value": "Interroll",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://admin-shell.io/idta/Manufacturer"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "ConveyorLength",
+          "valueType": "xs:double",
+          "value": "12.5",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/intralogistics/ConveyorLength"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "m"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "NominalSpeed",
+          "valueType": "xs:double",
+          "value": "0.8",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/intralogistics/NominalSpeed"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "m/s"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "modelType": "Submodel",
+      "id": "urn:submodel:acme:line-a:conveyor-transfer-01:operational-data",
+      "idShort": "OperationalData",
+      "submodelElements": [
+        {
+          "modelType": "Property",
+          "idShort": "CurrentSpeed",
+          "valueType": "xs:double",
+          "value": "0.72",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/intralogistics/CurrentSpeed"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "m/s"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "BufferLevel",
+          "valueType": "xs:integer",
+          "value": "6",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/intralogistics/BufferLevel"
+              }
+            ]
+          },
+          "qualifiers": [
+            {
+              "type": "unit",
+              "valueType": "xs:string",
+              "value": "parts"
+            }
+          ]
+        },
+        {
+          "modelType": "Property",
+          "idShort": "UpstreamAsset",
+          "valueType": "xs:string",
+          "value": "urn:asset:acme:line-a:cnc-mill-01",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/factory/UpstreamAsset"
+              }
+            ]
+          }
+        },
+        {
+          "modelType": "Property",
+          "idShort": "DownstreamAsset",
+          "valueType": "xs:string",
+          "value": "urn:asset:acme:line-a:vision-inspection-01",
+          "semanticId": {
+            "type": "ExternalReference",
+            "keys": [
+              {
+                "type": "ConceptDescription",
+                "value": "https://example.com/semantic/factory/DownstreamAsset"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "conceptDescriptions": []
+}

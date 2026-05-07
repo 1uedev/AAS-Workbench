@@ -41,6 +41,12 @@
 - Added OPC UA / MQTT gateway mapping MVP.
 - Added `GatewayMapping` Submodel generation for exportable gateway configuration.
 - Added sample CSV data.
+- Added five coherent realistic manufacturing AAS examples as JSON and AASX:
+  - CNC milling machine
+  - Robot loading cell
+  - Conveyor transfer system
+  - Vision inspection station
+  - Line energy meter
 - Added README with setup and route documentation.
 - Pushed initial code to GitHub:
   - Repository: `https://github.com/1uedev/AAS-Workbench.git`
@@ -62,3 +68,6 @@
   - AASX export click without console errors
 - Local `.aasx` package generated and inspected with `unzip -l`.
 - AASX export/import roundtrip tested in Node with matching AAS structure.
+- Realistic sample JSON files parsed successfully.
+- Realistic sample AASX files passed `unzip -t`.
+- Realistic sample AASX files imported successfully with the Workbench import module.
