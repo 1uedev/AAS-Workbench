@@ -29,15 +29,15 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 - [ ] Add richer batch generation controls for mapped tables.
 - [ ] Add template preview before generation.
 
-## AAS Registry / Repository
+## Repository Enhancements
 
-- [ ] Add persistent storage.
-- [ ] Add version history.
 - [ ] Add search by asset.
 - [ ] Add search by manufacturer.
 - [ ] Add search by semantic ID.
 - [ ] Add search by submodel.
 - [ ] Add roles and access control.
+- [ ] Add diff view between AAS versions.
+- [ ] Add explicit traceability event view in the UI.
 
 ## AAS Dashboard Builder
 

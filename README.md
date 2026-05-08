@@ -9,6 +9,7 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 - AAS manuell über einen Multi-Submodel-/Multi-Property-Generator erzeugen
 - CSV- und Excel-Dateien (`.xlsx`) mit Mapping-Dialog in eine einfache AAS-Struktur umwandeln
 - OPC-UA- und MQTT-Quellen als Gateway-Mapping-Submodel dokumentieren
+- AAS versioniert in einem lokalen Repository speichern und laden
 - Pflichtfelder, `idShort`-Format und Submodel-Referenzen validieren
 - AAS, Submodels und Properties durchsuchen
 - Ergebnis als JSON oder `.aasx` exportieren
@@ -38,7 +39,7 @@ Das Gateway-Formular ergänzt die aktuell geladene AAS um ein `GatewayMapping`-S
 ## Start
 
 ```bash
-python3 -m http.server 8081
+node server.js
 ```
 
 Danach im Browser öffnen:
@@ -53,8 +54,24 @@ Unterseiten:
 http://localhost:8081/#import
 http://localhost:8081/#generator
 http://localhost:8081/#gateway
+http://localhost:8081/#repository
 http://localhost:8081/#explorer
 ```
+
+## Backend und Versionierung
+
+`server.js` liefert die statische App aus und stellt ein kleines API bereit:
+
+```text
+GET  /api/aas
+POST /api/aas
+GET  /api/aas/:id
+GET  /api/aas/:id/versions
+GET  /api/aas/:id/versions/:version
+GET  /api/aas/:id/events
+```
+
+Die Repository-Daten werden lokal in `data/repository.json` gespeichert. Diese Datei ist absichtlich nicht versioniert.
 
 ## Tabellenimport
 

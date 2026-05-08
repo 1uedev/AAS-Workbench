@@ -119,7 +119,7 @@ select {
 
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  grid-template-columns: repeat(5, minmax(170px, 1fr));
   gap: 14px;
 }
 
@@ -219,19 +219,27 @@ body:not([data-route="home"]) .home-page {
 
 body[data-route="import"] [data-panel="generator"],
 body[data-route="import"] [data-panel="gateway"],
+body[data-route="import"] [data-panel="repository"],
 body[data-route="generator"] [data-panel="import"],
 body[data-route="generator"] [data-panel="gateway"],
+body[data-route="generator"] [data-panel="repository"],
 body[data-route="gateway"] [data-panel="import"],
 body[data-route="gateway"] [data-panel="generator"],
+body[data-route="gateway"] [data-panel="repository"],
+body[data-route="repository"] [data-panel="import"],
+body[data-route="repository"] [data-panel="generator"],
+body[data-route="repository"] [data-panel="gateway"],
 body[data-route="explorer"] [data-panel="import"],
 body[data-route="explorer"] [data-panel="generator"],
-body[data-route="explorer"] [data-panel="gateway"] {
+body[data-route="explorer"] [data-panel="gateway"],
+body[data-route="explorer"] [data-panel="repository"] {
   display: none;
 }
 
 body[data-route="import"] [data-panel="import"],
 body[data-route="generator"] [data-panel="generator"],
 body[data-route="gateway"] [data-panel="gateway"],
+body[data-route="repository"] [data-panel="repository"],
 body[data-route="explorer"] [data-panel="status"] {
   order: 1;
 }
@@ -255,13 +263,14 @@ body:not([data-route="home"]) [data-panel="explorer"] {
 .import-panel,
 .status-panel,
 .generator-panel,
-.gateway-panel {
+.gateway-panel,
+.repository-panel {
   min-height: 280px;
 }
 
 .explorer-panel {
   grid-column: 2;
-  grid-row: 1 / span 4;
+  grid-row: 1 / span 5;
   min-height: calc(100vh - 150px);
 }
 
@@ -433,6 +442,38 @@ body:not([data-route="home"]) [data-panel="explorer"] {
   border-radius: 8px;
   padding: 12px;
   background: #fff;
+}
+
+.repository-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.repository-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfa;
+}
+
+.repository-card h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.repository-meta,
+.version-list {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.version-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .score-row {

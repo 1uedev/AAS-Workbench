@@ -42,6 +42,11 @@
   - `aasx/data.json`
 - Added OPC UA / MQTT gateway mapping MVP.
 - Added `GatewayMapping` Submodel generation for exportable gateway configuration.
+- Added local backend with static file serving and AAS Repository API.
+- Added file-backed repository persistence in `data/repository.json`.
+- Added version history for saved AAS payloads.
+- Added traceability events for repository saves.
+- Added Repository UI for saving current AAS and loading stored versions.
 - Added sample CSV data.
 - Added five coherent realistic manufacturing AAS examples as JSON and AASX:
   - CNC milling machine
@@ -64,6 +69,8 @@
   - Home route
   - Subpage navigation
   - Import route and drop-zone UI
+  - Repository route
+  - Repository save and version load
   - Sample loading
   - Manual generator
   - Gateway mapping

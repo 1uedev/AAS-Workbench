@@ -17,6 +17,7 @@
         <a href="#import" data-route-link="import">Import</a>
         <a href="#generator" data-route-link="generator">Generator</a>
         <a href="#gateway" data-route-link="gateway">Gateway</a>
+        <a href="#repository" data-route-link="repository">Repository</a>
         <a href="#explorer" data-route-link="explorer">Explorer</a>
       </nav>
       <div class="header-actions">
@@ -51,6 +52,11 @@
           <span class="feature-kicker">Explorer</span>
           <strong>Validieren und durchsuchen</strong>
           <span>AAS-Struktur, Issues, Submodels und Properties inspizieren.</span>
+        </a>
+        <a class="feature-card" href="#repository">
+          <span class="feature-kicker">Repository</span>
+          <strong>Versioniert speichern</strong>
+          <span>AAS-Versionen sichern, laden und Traceability-Events nachvollziehen.</span>
         </a>
       </section>
     </main>
@@ -153,6 +159,25 @@
             <button class="secondary-button" type="submit">Mapping-Submodel hinzufügen</button>
           </div>
         </form>
+      </section>
+
+      <section class="workspace-panel repository-panel" data-panel="repository" aria-labelledby="repository-title">
+        <div class="section-heading">
+          <p class="eyebrow">Repository</p>
+          <h2 id="repository-title">AAS versionieren</h2>
+        </div>
+        <form id="repositoryForm" class="tool-form">
+          <label class="field">
+            <span>Change Reason</span>
+            <input id="repositoryReason" name="changeReason" placeholder="Initial import, gateway mapping update, manual correction ..." />
+          </label>
+          <div class="action-row">
+            <button id="saveRepositoryButton" class="primary-button" type="submit" disabled>Aktuelle AAS speichern</button>
+            <button id="refreshRepositoryButton" class="secondary-button" type="button">Repository aktualisieren</button>
+          </div>
+        </form>
+        <div id="repositoryStatus" class="summary-text">Backend-Status wird beim Aktualisieren geprüft.</div>
+        <div id="repositoryList" class="repository-list"></div>
       </section>
 
       <section class="workspace-panel explorer-panel" data-panel="explorer" aria-labelledby="explorer-title">

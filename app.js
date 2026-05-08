@@ -23,6 +23,12 @@ const manualGeneratorForm = document.querySelector("#manualGeneratorForm");
 const submodelBuilder = document.querySelector("#submodelBuilder");
 const addSubmodelButton = document.querySelector("#addSubmodelButton");
 const gatewayForm = document.querySelector("#gatewayForm");
+const repositoryForm = document.querySelector("#repositoryForm");
+const repositoryReason = document.querySelector("#repositoryReason");
+const saveRepositoryButton = document.querySelector("#saveRepositoryButton");
+const refreshRepositoryButton = document.querySelector("#refreshRepositoryButton");
+const repositoryStatus = document.querySelector("#repositoryStatus");
+const repositoryList = document.querySelector("#repositoryList");
 const routeLinks = [...document.querySelectorAll("[data-route-link]")];
 
 let currentPackage = null;
@@ -31,6 +37,7 @@ let pendingTableImport = null;
 let gatewayMappingCounter = 1;
 let submodelCounter = 1;
 let propertyCounter = 1;
+let repositoryAssets = [];
 
 const targetColumns = [
   { key: "assetId", label: "Asset ID", required: true, aliases: ["assetid", "asset id", "globalassetid", "global asset id"] },
@@ -140,6 +147,19 @@ searchInput.addEventListener("input", () => {
   if (currentPackage) renderExplorer(currentPackage, searchInput.value);
 });
 
+repositoryForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveCurrentPackageToRepository();
+});
+
+refreshRepositoryButton.addEventListener("click", refreshRepository);
+
+repositoryList.addEventListener("click", async (event) => {
+  const loadVersionButton = event.target.closest("[data-action='load-version']");
+  if (!loadVersionButton) return;
+  await loadRepositoryVersion(loadVersionButton.dataset.assetId, loadVersionButton.dataset.version);
+});
+
 manualGeneratorForm.addEventListener("submit", (event) => {
   event.preventDefault();
   try {
@@ -221,7 +241,7 @@ function applyRoute() {
 
 function getRoute() {
   const route = window.location.hash.replace("#", "") || "home";
-  return ["home", "import", "generator", "gateway", "explorer"].includes(route) ? route : "home";
+  return ["home", "import", "generator", "gateway", "repository", "explorer"].includes(route) ? route : "home";
 }
 
 function navigateTo(route) {
@@ -373,6 +393,95 @@ function loadPackage(aasPackage) {
   renderExplorer(aasPackage, searchInput.value);
   downloadButton.disabled = false;
   downloadAasxButton.disabled = false;
+  saveRepositoryButton.disabled = false;
+}
+
+async function saveCurrentPackageToRepository() {
+  if (!currentPackage) return;
+
+  try {
+    const response = await fetch("/api/aas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        payload: currentPackage,
+        changeReason: repositoryReason.value.trim() || "Saved from Workbench",
+        createdBy: "Workbench UI",
+      }),
+    });
+    const result = await readApiResponse(response);
+    repositoryReason.value = "";
+    repositoryStatus.textContent = `Gespeichert: ${result.idShort}, Version ${result.version}.`;
+    await refreshRepository();
+  } catch (error) {
+    repositoryStatus.textContent = `Repository nicht verfuegbar: ${error.message}`;
+  }
+}
+
+async function refreshRepository() {
+  try {
+    repositoryStatus.textContent = "Repository wird geladen ...";
+    const response = await fetch("/api/aas");
+    repositoryAssets = await readApiResponse(response);
+    renderRepositoryList(repositoryAssets);
+    repositoryStatus.textContent = repositoryAssets.length
+      ? `${repositoryAssets.length} AAS im Repository.`
+      : "Repository ist erreichbar, aber noch leer.";
+  } catch (error) {
+    repositoryStatus.textContent = `Repository nicht verfuegbar: ${error.message}`;
+    repositoryList.innerHTML = "";
+  }
+}
+
+async function loadRepositoryVersion(assetId, version) {
+  try {
+    const response = await fetch(`/api/aas/${encodeURIComponent(assetId)}/versions/${encodeURIComponent(version)}`);
+    const result = await readApiResponse(response);
+    currentFileName = toIdShort(result.asset.idShort || "repository-aas").toLowerCase();
+    loadPackage(normalizeAasJson(result.payload));
+    repositoryStatus.textContent = `Geladen: ${result.asset.idShort}, Version ${result.version}.`;
+    navigateTo("explorer");
+  } catch (error) {
+    repositoryStatus.textContent = `Version konnte nicht geladen werden: ${error.message}`;
+  }
+}
+
+async function readApiResponse(response) {
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || `HTTP ${response.status}`);
+  }
+  return payload;
+}
+
+function renderRepositoryList(assets) {
+  repositoryList.innerHTML = assets.length
+    ? assets.map(renderRepositoryCard).join("")
+    : `<div class="repository-card"><h3>Keine AAS gespeichert</h3><div class="repository-meta">Speichere zuerst eine geladene AAS.</div></div>`;
+}
+
+function renderRepositoryCard(asset) {
+  const versions = Array.from({ length: asset.latestVersion }, (_, index) => index + 1);
+  return `
+    <article class="repository-card">
+      <h3>${escapeHtml(asset.idShort)}</h3>
+      <div class="repository-meta">${escapeHtml(asset.globalAssetId)}</div>
+      <div class="repository-meta">Latest Version: ${asset.latestVersion} | Updated: ${formatDateTime(asset.updatedAt)}</div>
+      <div class="version-list">
+        ${versions
+          .map(
+            (version) =>
+              `<button class="secondary-button" type="button" data-action="load-version" data-asset-id="${escapeHtml(asset.id)}" data-version="${version}">v${version}</button>`,
+          )
+          .join("")}
+      </div>
+    </article>
+  `;
+}
+
+function formatDateTime(value) {
+  if (!value) return "unbekannt";
+  return new Date(value).toLocaleString("de-DE");
 }
 
 function addGatewayMapping(mapping) {
@@ -1055,6 +1164,7 @@ function renderError(error) {
   currentPackage = null;
   downloadButton.disabled = true;
   downloadAasxButton.disabled = true;
+  saveRepositoryButton.disabled = true;
   statusLabel.className = "status-pill invalid";
   statusLabel.textContent = "Importfehler";
   summaryText.textContent = error.message;
