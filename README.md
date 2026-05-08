@@ -5,7 +5,7 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 ## Funktionen
 
 - Hauptseite mit Unterseiten fuer Import, Generator, Gateway und Explorer
-- AASX und AAS-JSON laden und prüfen
+- AASX und AAS-JSON per Dateiauswahl oder Drag-and-Drop laden und prüfen
 - AAS manuell über ein Generator-Formular erzeugen
 - CSV- und Excel-Dateien (`.xlsx`) mit Mapping-Dialog in eine einfache AAS-Struktur umwandeln
 - OPC-UA- und MQTT-Quellen als Gateway-Mapping-Submodel dokumentieren

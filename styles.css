@@ -292,6 +292,11 @@ body:not([data-route="home"]) [data-panel="explorer"] {
   border-color: var(--brand);
 }
 
+.drop-zone.is-dragging {
+  border-color: var(--brand);
+  background: #e7f1ed;
+}
+
 .drop-zone input {
   position: absolute;
   inline-size: 1px;

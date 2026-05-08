@@ -2,6 +2,7 @@ import { createAasxBlob } from "./aasx-export.js";
 import { readAasxPackage } from "./aasx-import.js";
 
 const fileInput = document.querySelector("#fileInput");
+const dropZone = document.querySelector(".drop-zone");
 const loadSampleButton = document.querySelector("#loadSampleButton");
 const downloadButton = document.querySelector("#downloadButton");
 const downloadAasxButton = document.querySelector("#downloadAasxButton");
@@ -50,6 +51,34 @@ applyRoute();
 
 fileInput.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
+  await importSelectedFile(file);
+  fileInput.value = "";
+});
+
+dropZone.addEventListener("dragenter", (event) => {
+  event.preventDefault();
+  dropZone.classList.add("is-dragging");
+});
+
+dropZone.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "copy";
+  dropZone.classList.add("is-dragging");
+});
+
+dropZone.addEventListener("dragleave", (event) => {
+  if (!dropZone.contains(event.relatedTarget)) {
+    dropZone.classList.remove("is-dragging");
+  }
+});
+
+dropZone.addEventListener("drop", async (event) => {
+  event.preventDefault();
+  dropZone.classList.remove("is-dragging");
+  await importSelectedFile(event.dataTransfer.files?.[0]);
+});
+
+async function importSelectedFile(file) {
   if (!file) return;
 
   currentFileName = file.name.replace(/\.[^.]+$/, "") || "aas-export";
@@ -69,10 +98,8 @@ fileInput.addEventListener("change", async (event) => {
     }
   } catch (error) {
     renderError(error);
-  } finally {
-    fileInput.value = "";
   }
-});
+}
 
 loadSampleButton.addEventListener("click", () => {
   currentFileName = "sample-aas";

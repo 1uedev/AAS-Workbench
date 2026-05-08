@@ -11,6 +11,7 @@
   - `#gateway`
   - `#explorer`
 - Added AAS JSON import.
+- Added drag-and-drop support for the import drop zone.
 - Added `.aasx` import:
   - Reads OPC/ZIP package contents
   - Resolves `/_rels/.rels`
@@ -61,6 +62,7 @@
 - Browser smoke tests for:
   - Home route
   - Subpage navigation
+  - Import route and drop-zone UI
   - Sample loading
   - Manual generator
   - Gateway mapping
@@ -71,3 +73,4 @@
 - Realistic sample JSON files parsed successfully.
 - Realistic sample AASX files passed `unzip -t`.
 - Realistic sample AASX files imported successfully with the Workbench import module.
+- AASX import path tested with a realistic sample file after adding drop support.
