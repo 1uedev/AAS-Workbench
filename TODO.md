@@ -26,7 +26,6 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 ## Generator Enhancements
 
 - [ ] Add reusable Submodel templates.
-- [ ] Add multi-property manual entry.
 - [ ] Add richer batch generation controls for mapped tables.
 - [ ] Add template preview before generation.
 

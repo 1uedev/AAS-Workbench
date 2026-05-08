@@ -6,7 +6,7 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 
 - Hauptseite mit Unterseiten fuer Import, Generator, Gateway und Explorer
 - AASX und AAS-JSON per Dateiauswahl oder Drag-and-Drop laden und prüfen
-- AAS manuell über ein Generator-Formular erzeugen
+- AAS manuell über einen Multi-Submodel-/Multi-Property-Generator erzeugen
 - CSV- und Excel-Dateien (`.xlsx`) mit Mapping-Dialog in eine einfache AAS-Struktur umwandeln
 - OPC-UA- und MQTT-Quellen als Gateway-Mapping-Submodel dokumentieren
 - Pflichtfelder, `idShort`-Format und Submodel-Referenzen validieren
@@ -31,7 +31,7 @@ aasx/data.json
 
 ## Generator und Gateway
 
-Der manuelle Generator erstellt aus Asset-, Submodel- und Property-Feldern direkt eine AAS-Umgebung.
+Der manuelle Generator erstellt aus Asset-Daten, mehreren Submodels und mehreren Properties pro Submodel direkt eine AAS-Umgebung.
 
 Das Gateway-Formular ergänzt die aktuell geladene AAS um ein `GatewayMapping`-Submodel. Darin werden Protokoll, Endpoint/Broker, OPC-UA-Node-ID oder MQTT-Topic, Ziel-Property und Sampling-Intervall abgelegt. Es ist aktuell eine exportierbare Konfiguration, noch keine Live-Verbindung zu OPC UA oder MQTT.
 

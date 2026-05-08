@@ -99,6 +99,7 @@
           <h2 id="generator-title">AAS manuell erzeugen</h2>
         </div>
         <form id="manualGeneratorForm" class="tool-form">
+          <div class="form-section-title">Asset</div>
           <div class="form-grid">
             <label class="field">
               <span>Asset ID</span>
@@ -108,42 +109,10 @@
               <span>Asset Name</span>
               <input name="assetName" required placeholder="Pump 001" />
             </label>
-            <label class="field">
-              <span>Submodel ID</span>
-              <input name="submodelId" required placeholder="urn:example:submodel:Pump-001:TechnicalData" />
-            </label>
-            <label class="field">
-              <span>Submodel Name</span>
-              <input name="submodelName" required placeholder="Technical Data" />
-            </label>
-            <label class="field">
-              <span>Property idShort</span>
-              <input name="idShort" required placeholder="NominalPower" />
-            </label>
-            <label class="field">
-              <span>Value Type</span>
-              <select name="valueType" required>
-                <option value="string">string</option>
-                <option value="double">double</option>
-                <option value="integer">integer</option>
-                <option value="boolean">boolean</option>
-                <option value="date">date</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Value</span>
-              <input name="value" required placeholder="7.5" />
-            </label>
-            <label class="field">
-              <span>Semantic ID</span>
-              <input name="semanticId" placeholder="https://admin-shell.io/idta/NominalPower" />
-            </label>
-            <label class="field">
-              <span>Unit</span>
-              <input name="unit" placeholder="kW" />
-            </label>
           </div>
+          <div class="submodel-builder" id="submodelBuilder"></div>
           <div class="action-row">
+            <button class="secondary-button" id="addSubmodelButton" type="button">Submodel hinzufügen</button>
             <button class="primary-button" type="submit">AAS erzeugen</button>
           </div>
         </form>

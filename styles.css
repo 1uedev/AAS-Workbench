@@ -340,6 +340,14 @@ body:not([data-route="home"]) [data-panel="explorer"] {
   gap: 16px;
 }
 
+.form-section-title {
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(160px, 1fr));
@@ -373,7 +381,58 @@ body:not([data-route="home"]) [data-panel="explorer"] {
 
 .action-row {
   display: flex;
+  gap: 10px;
   justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.submodel-builder {
+  display: grid;
+  gap: 14px;
+}
+
+.submodel-editor {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfcfa;
+}
+
+.submodel-editor-header,
+.property-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.submodel-editor-header h3,
+.property-editor-header h4 {
+  margin: 0;
+}
+
+.submodel-editor-header h3 {
+  font-size: 17px;
+}
+
+.property-editor-header h4 {
+  font-size: 14px;
+}
+
+.property-list {
+  display: grid;
+  gap: 10px;
+}
+
+.property-editor {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #e8ede8;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
 }
 
 .score-row {

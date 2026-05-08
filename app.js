@@ -20,6 +20,8 @@ const mappingSummary = document.querySelector("#mappingSummary");
 const closeMappingButton = document.querySelector("#closeMappingButton");
 const cancelMappingButton = document.querySelector("#cancelMappingButton");
 const manualGeneratorForm = document.querySelector("#manualGeneratorForm");
+const submodelBuilder = document.querySelector("#submodelBuilder");
+const addSubmodelButton = document.querySelector("#addSubmodelButton");
 const gatewayForm = document.querySelector("#gatewayForm");
 const routeLinks = [...document.querySelectorAll("[data-route-link]")];
 
@@ -27,6 +29,8 @@ let currentPackage = null;
 let currentFileName = "aas-export";
 let pendingTableImport = null;
 let gatewayMappingCounter = 1;
+let submodelCounter = 1;
+let propertyCounter = 1;
 
 const targetColumns = [
   { key: "assetId", label: "Asset ID", required: true, aliases: ["assetid", "asset id", "globalassetid", "global asset id"] },
@@ -48,6 +52,18 @@ urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:OperationalDat
 
 window.addEventListener("hashchange", applyRoute);
 applyRoute();
+addSubmodelEditor({
+  idShort: "TechnicalData",
+  properties: [
+    {
+      idShort: "Manufacturer",
+      valueType: "string",
+      value: "ACME Industrial",
+      semanticId: "https://admin-shell.io/idta/Manufacturer",
+      unit: "",
+    },
+  ],
+});
 
 fileInput.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
@@ -126,9 +142,40 @@ searchInput.addEventListener("input", () => {
 
 manualGeneratorForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  const record = Object.fromEntries(new FormData(manualGeneratorForm).entries());
-  currentFileName = toIdShort(record.assetName || record.assetId || "generated-aas").toLowerCase();
-  loadPackage(recordsToAasPackage([record]));
+  try {
+    const aasPackage = buildPackageFromGenerator();
+    const formData = new FormData(manualGeneratorForm);
+    currentFileName = toIdShort(formData.get("assetName") || formData.get("assetId") || "generated-aas").toLowerCase();
+    loadPackage(aasPackage);
+    navigateTo("explorer");
+  } catch (error) {
+    renderError(error);
+  }
+});
+
+addSubmodelButton.addEventListener("click", () => addSubmodelEditor());
+
+submodelBuilder.addEventListener("click", (event) => {
+  const addPropertyButton = event.target.closest("[data-action='add-property']");
+  if (addPropertyButton) {
+    addPropertyEditor(addPropertyButton.closest(".submodel-editor").querySelector(".property-list"));
+    return;
+  }
+
+  const removePropertyButton = event.target.closest("[data-action='remove-property']");
+  if (removePropertyButton) {
+    const propertyEditor = removePropertyButton.closest(".property-editor");
+    const propertyList = propertyEditor.closest(".property-list");
+    if (propertyList.querySelectorAll(".property-editor").length > 1) {
+      propertyEditor.remove();
+    }
+    return;
+  }
+
+  const removeSubmodelButton = event.target.closest("[data-action='remove-submodel']");
+  if (removeSubmodelButton && submodelBuilder.querySelectorAll(".submodel-editor").length > 1) {
+    removeSubmodelButton.closest(".submodel-editor").remove();
+  }
 });
 
 gatewayForm.addEventListener("submit", (event) => {
@@ -188,6 +235,135 @@ function navigateTo(route) {
 function closeMappingDialog() {
   pendingTableImport = null;
   mappingDialog.close();
+}
+
+function addSubmodelEditor(seed = {}) {
+  const submodelIndex = submodelCounter;
+  submodelCounter += 1;
+  const submodel = document.createElement("section");
+  submodel.className = "submodel-editor";
+  submodel.dataset.submodelIndex = String(submodelIndex);
+  submodel.innerHTML = `
+    <div class="submodel-editor-header">
+      <h3>Submodel</h3>
+      <button class="secondary-button" type="button" data-action="remove-submodel">Entfernen</button>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Submodel ID</span>
+        <input data-field="submodelId" placeholder="urn:example:submodel:Pump-001:TechnicalData" />
+      </label>
+      <label class="field">
+        <span>Submodel Name</span>
+        <input data-field="submodelName" required placeholder="Technical Data" />
+      </label>
+    </div>
+    <div class="property-list"></div>
+    <div class="action-row">
+      <button class="secondary-button" type="button" data-action="add-property">Property hinzufügen</button>
+    </div>
+  `;
+
+  submodel.querySelector("[data-field='submodelName']").value = seed.idShort ?? "";
+  submodel.querySelector("[data-field='submodelId']").value = seed.id ?? "";
+  submodelBuilder.append(submodel);
+
+  const propertyList = submodel.querySelector(".property-list");
+  const properties = seed.properties?.length ? seed.properties : [{}];
+  properties.forEach((property) => addPropertyEditor(propertyList, property));
+}
+
+function addPropertyEditor(propertyList, seed = {}) {
+  const propertyIndex = propertyCounter;
+  propertyCounter += 1;
+  const property = document.createElement("section");
+  property.className = "property-editor";
+  property.dataset.propertyIndex = String(propertyIndex);
+  property.innerHTML = `
+    <div class="property-editor-header">
+      <h4>Property</h4>
+      <button class="secondary-button" type="button" data-action="remove-property">Entfernen</button>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>idShort</span>
+        <input data-field="idShort" required placeholder="NominalPower" />
+      </label>
+      <label class="field">
+        <span>Value Type</span>
+        <select data-field="valueType" required>
+          <option value="string">string</option>
+          <option value="double">double</option>
+          <option value="integer">integer</option>
+          <option value="boolean">boolean</option>
+          <option value="date">date</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Value</span>
+        <input data-field="value" required placeholder="7.5" />
+      </label>
+      <label class="field">
+        <span>Semantic ID</span>
+        <input data-field="semanticId" placeholder="https://admin-shell.io/idta/NominalPower" />
+      </label>
+      <label class="field">
+        <span>Unit</span>
+        <input data-field="unit" placeholder="kW" />
+      </label>
+    </div>
+  `;
+
+  property.querySelector("[data-field='idShort']").value = seed.idShort ?? "";
+  property.querySelector("[data-field='valueType']").value = seed.valueType ?? "string";
+  property.querySelector("[data-field='value']").value = seed.value ?? "";
+  property.querySelector("[data-field='semanticId']").value = seed.semanticId ?? "";
+  property.querySelector("[data-field='unit']").value = seed.unit ?? "";
+  propertyList.append(property);
+}
+
+function buildPackageFromGenerator() {
+  const formData = new FormData(manualGeneratorForm);
+  const assetId = String(formData.get("assetId") ?? "").trim();
+  const assetName = String(formData.get("assetName") ?? "").trim();
+  if (!assetId || !assetName) {
+    throw new Error("Asset ID und Asset Name sind Pflichtfelder.");
+  }
+
+  const records = [];
+  for (const submodelEditor of submodelBuilder.querySelectorAll(".submodel-editor")) {
+    const submodelName = submodelEditor.querySelector("[data-field='submodelName']").value.trim();
+    const explicitSubmodelId = submodelEditor.querySelector("[data-field='submodelId']").value.trim();
+    if (!submodelName) {
+      throw new Error("Jedes Submodel braucht einen Namen.");
+    }
+
+    const submodelId = explicitSubmodelId || `${assetId}:submodel:${toIdShort(submodelName)}`;
+    for (const propertyEditor of submodelEditor.querySelectorAll(".property-editor")) {
+      const record = {
+        assetId,
+        assetName,
+        submodelId,
+        submodelName,
+        idShort: propertyEditor.querySelector("[data-field='idShort']").value.trim(),
+        valueType: propertyEditor.querySelector("[data-field='valueType']").value,
+        value: propertyEditor.querySelector("[data-field='value']").value.trim(),
+        semanticId: propertyEditor.querySelector("[data-field='semanticId']").value.trim(),
+        unit: propertyEditor.querySelector("[data-field='unit']").value.trim(),
+      };
+
+      if (!record.idShort || !record.value) {
+        throw new Error(`Submodel ${submodelName} enthaelt eine unvollstaendige Property.`);
+      }
+      records.push(record);
+    }
+  }
+
+  if (records.length === 0) {
+    throw new Error("Mindestens eine Property ist erforderlich.");
+  }
+
+  return recordsToAasPackage(records);
 }
 
 function loadPackage(aasPackage) {

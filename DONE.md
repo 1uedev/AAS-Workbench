@@ -22,6 +22,7 @@
 - Added CSV import with mapping dialog.
 - Added Excel `.xlsx` import with mapping dialog.
 - Added manual AAS generator MVP.
+- Replaced the single-property generator with a multi-submodel and multi-property generator.
 - Added AAS validator MVP:
   - Package arrays
   - Required IDs
