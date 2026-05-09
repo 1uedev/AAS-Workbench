@@ -31,9 +31,17 @@
   - Missing `semanticId`
   - Submodel reference checks
   - Duplicate element `idShort` warnings
+- Expanded validation toward AAS Metamodel 3.x:
+  - `modelType` checks for AAS, Submodels, ConceptDescriptions and Submodel Elements
+  - AAS reference shape, key type and Submodel `ModelReference` checks
+  - AAS 3.x `idShort` format including hyphen support
+  - `DataTypeDefXsd` checks for Property, Range and Qualifier values
+  - Recursive checks for nested Collections, Lists, Entities, Operations, Events and Relationships
 - Added explorer view for AAS, Submodels and Properties.
 - Added search over loaded AAS structure.
 - Added JSON export.
+- Added PDF report export for the currently loaded AAS package.
+- Added Excel workbook export with Summary, AAS, Submodels, Elements and Issues sheets.
 - Added real `.aasx` export as OPC/ZIP package with:
   - `[Content_Types].xml`
   - `_rels/.rels`
@@ -47,7 +55,10 @@
 - Added version history for saved AAS payloads.
 - Added traceability events for repository saves.
 - Added Repository UI for saving current AAS and loading stored versions.
+- Added Repository compare view for two AAS versions with added, removed and changed AAS entries.
 - Added sample CSV data.
+- Replaced the flat Explorer list with expandable tree navigation for AAS, Submodels and nested Submodel Elements.
+- Added side-by-side JSON inspector for the selected Explorer node.
 - Added five coherent realistic manufacturing AAS examples as JSON and AASX:
   - CNC milling machine
   - Robot loading cell
@@ -63,6 +74,8 @@
 ## Verified
 
 - `node --check app.js`
+- `node --check pdf-export.js`
+- `node --check xlsx-export.js`
 - `node --check aasx-export.js`
 - `node --check aasx-import.js`
 - Browser smoke tests for:
@@ -76,6 +89,15 @@
   - Gateway mapping
   - JSON/AASX export button states
   - AASX export click without console errors
+  - Explorer tree expansion, node selection and JSON inspector updates
+  - Explorer search filtering with automatic JSON selection
+  - Explorer desktop and mobile responsive layout without console errors
+  - Repository version compare flow on desktop and mobile
+  - AAS 3.x validation status after sample loading
+- Browser check for enabled PDF export after sample loading
+- Node-generated PDF report rendered with Quick Look for visual inspection
+- Browser check for enabled Excel export after sample loading
+- Node-generated Excel workbook passed `unzip -t` and rendered with Quick Look
 - Local `.aasx` package generated and inspected with `unzip -l`.
 - AASX export/import roundtrip tested in Node with matching AAS structure.
 - Realistic sample JSON files parsed successfully.

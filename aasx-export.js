@@ -41,7 +41,7 @@ export function createAasxBytes(aasPackage) {
   ]);
 }
 
-function createZip(files) {
+export function createZip(files) {
   const encoder = new TextEncoder();
   const localParts = [];
   const centralParts = [];

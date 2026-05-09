@@ -4,19 +4,10 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Improve tree navigation for AAS, Submodels and Submodel Elements.
-- [ ] Add side-by-side JSON inspector.
-
-## AAS Explorer / Viewer
-
-- [ ] Add compare view for two AAS versions.
-- [ ] Add export to PDF.
-- [ ] Add export to Excel.
+- [ ] Add severity levels and validation categories.
 
 ## Validator Enhancements
 
-- [ ] Add validation against AAS Metamodel 3.x.
-- [ ] Add severity levels and validation categories.
 - [ ] Check semantic IDs more deeply.
 - [ ] Check data types more deeply.
 - [ ] Check references more deeply.
@@ -36,7 +27,6 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 - [ ] Add search by semantic ID.
 - [ ] Add search by submodel.
 - [ ] Add roles and access control.
-- [ ] Add diff view between AAS versions.
 - [ ] Add explicit traceability event view in the UI.
 
 ## AAS Dashboard Builder

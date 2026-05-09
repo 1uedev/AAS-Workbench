@@ -24,6 +24,8 @@
         <button id="loadSampleButton" class="secondary-button" type="button">Beispiel laden</button>
         <button id="downloadButton" class="primary-button" type="button" disabled>JSON exportieren</button>
         <button id="downloadAasxButton" class="primary-button" type="button" disabled>AASX exportieren</button>
+        <button id="downloadPdfButton" class="primary-button" type="button" disabled>PDF exportieren</button>
+        <button id="downloadExcelButton" class="primary-button" type="button" disabled>Excel exportieren</button>
       </div>
     </header>
 
@@ -180,6 +182,14 @@
         <div id="repositoryList" class="repository-list"></div>
       </section>
 
+      <section class="workspace-panel compare-panel" data-panel="compare" aria-labelledby="compare-title">
+        <div class="section-heading">
+          <p class="eyebrow">Compare</p>
+          <h2 id="compare-title">Versionen vergleichen</h2>
+        </div>
+        <div id="compareResult" class="compare-empty">Waehle im Repository zwei Versionen eines AAS aus.</div>
+      </section>
+
       <section class="workspace-panel explorer-panel" data-panel="explorer" aria-labelledby="explorer-title">
         <div class="section-heading">
           <p class="eyebrow">Explorer</p>
@@ -187,8 +197,25 @@
         </div>
         <div class="toolbar">
           <input id="searchInput" type="search" placeholder="Suchen nach idShort, ID, Semantic ID oder Wert" />
+          <div class="toolbar-actions" aria-label="Tree Aktionen">
+            <button id="expandTreeButton" class="secondary-button" type="button">Alles oeffnen</button>
+            <button id="collapseTreeButton" class="secondary-button" type="button">Reduzieren</button>
+          </div>
         </div>
-        <div id="explorer" class="explorer-empty">Noch keine AAS geladen.</div>
+        <div class="explorer-workbench">
+          <div id="explorer" class="explorer-empty">Noch keine AAS geladen.</div>
+          <aside id="jsonInspector" class="json-inspector" aria-live="polite">
+            <div class="inspector-header">
+              <div>
+                <p class="eyebrow">JSON</p>
+                <h3 id="jsonInspectorTitle">Keine Auswahl</h3>
+                <div id="jsonInspectorMeta" class="meta">Lade eine AAS, um JSON zu inspizieren.</div>
+              </div>
+              <button id="copyJsonButton" class="secondary-button" type="button" disabled>Kopieren</button>
+            </div>
+            <pre id="jsonInspectorContent">Keine Daten geladen.</pre>
+          </aside>
+        </div>
       </section>
     </main>
 

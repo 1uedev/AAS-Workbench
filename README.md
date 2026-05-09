@@ -10,9 +10,11 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 - CSV- und Excel-Dateien (`.xlsx`) mit Mapping-Dialog in eine einfache AAS-Struktur umwandeln
 - OPC-UA- und MQTT-Quellen als Gateway-Mapping-Submodel dokumentieren
 - AAS versioniert in einem lokalen Repository speichern und laden
-- Pflichtfelder, `idShort`-Format und Submodel-Referenzen validieren
-- AAS, Submodels und Properties durchsuchen
-- Ergebnis als JSON oder `.aasx` exportieren
+- AAS-Strukturen gegen zentrale AAS-3.x-Metamodellregeln validieren
+- AAS, Submodels und Submodel Elements per Tree navigieren und durchsuchen
+- Ausgewaehlte Explorer-Knoten im Side-by-side JSON Inspector pruefen
+- Zwei Repository-Versionen eines AAS vergleichen und Aenderungen nach hinzugefuegt, entfernt und geaendert sehen
+- Ergebnis als JSON, `.aasx`, PDF-Report oder Excel-Arbeitsmappe exportieren
 
 ## AASX-Export
 
@@ -29,6 +31,18 @@ aasx/data.json
 ```
 
 `aasx/data.json` enthält die aktuell geladene AAS-Umgebung.
+
+## PDF-Export
+
+Der PDF-Export erzeugt einen kompakten Report zur aktuell geladenen AAS-Umgebung mit Dateiinfo, Validierungsstatus, Kennzahlen, AAS-IDs, referenzierten Submodels und Submodel Elements.
+
+## Excel-Export
+
+Der Excel-Export erzeugt eine `.xlsx`-Arbeitsmappe mit getrennten Sheets fuer Summary, AAS, Submodels, Elements und Issues. Damit lassen sich AAS-Daten direkt filtern, auswerten und in andere Werkzeuge uebernehmen.
+
+## Validierung
+
+Die Validierung prueft zentrale AAS-3.x-Regeln: Pflichtfelder, `modelType`, `idShort`, Reference-/Key-Struktur, Submodel-Referenzen, `DataTypeDefXsd`-Werte sowie verschachtelte Submodel Elements wie Collections, Lists, Entities, Operations, Events und Relationships.
 
 ## Generator und Gateway
 
@@ -72,6 +86,7 @@ GET  /api/aas/:id/events
 ```
 
 Die Repository-Daten werden lokal in `data/repository.json` gespeichert. Diese Datei ist absichtlich nicht versioniert.
+Im Repository kann ein gespeichertes AAS ueber zwei Versionsauswahlen verglichen werden. Der Compare View zeigt Kennzahlen, Version-Metadaten und strukturelle Unterschiede fuer AAS, Submodels und Submodel Elements.
 
 ## Tabellenimport
 
@@ -104,6 +119,6 @@ Jedes Beispiel ist als `.json` und als importierbares `.aasx` vorhanden.
 ## Nächste sinnvolle Ausbaustufen
 
 - Live-Gateway-Backend fuer OPC UA und MQTT
-- Validierung gegen AAS-Metamodell 3.x
+- Validierungsreport mit Kategorien und maschinenlesbarem Export
 - Submodel-Template-Katalog
 - Backend-API mit Repository und Versionierung

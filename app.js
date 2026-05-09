@@ -1,17 +1,27 @@
 import { createAasxBlob } from "./aasx-export.js";
 import { readAasxPackage } from "./aasx-import.js";
+import { createAasPdfBlob } from "./pdf-export.js";
+import { createAasExcelBlob } from "./xlsx-export.js";
 
 const fileInput = document.querySelector("#fileInput");
 const dropZone = document.querySelector(".drop-zone");
 const loadSampleButton = document.querySelector("#loadSampleButton");
 const downloadButton = document.querySelector("#downloadButton");
 const downloadAasxButton = document.querySelector("#downloadAasxButton");
+const downloadPdfButton = document.querySelector("#downloadPdfButton");
+const downloadExcelButton = document.querySelector("#downloadExcelButton");
 const statusLabel = document.querySelector("#statusLabel");
 const summaryText = document.querySelector("#summaryText");
 const stats = document.querySelector("#stats");
 const issuesList = document.querySelector("#issuesList");
 const explorer = document.querySelector("#explorer");
 const searchInput = document.querySelector("#searchInput");
+const expandTreeButton = document.querySelector("#expandTreeButton");
+const collapseTreeButton = document.querySelector("#collapseTreeButton");
+const jsonInspectorTitle = document.querySelector("#jsonInspectorTitle");
+const jsonInspectorMeta = document.querySelector("#jsonInspectorMeta");
+const jsonInspectorContent = document.querySelector("#jsonInspectorContent");
+const copyJsonButton = document.querySelector("#copyJsonButton");
 const mappingDialog = document.querySelector("#mappingDialog");
 const mappingForm = document.querySelector("#mappingForm");
 const mappingFields = document.querySelector("#mappingFields");
@@ -29,15 +39,21 @@ const saveRepositoryButton = document.querySelector("#saveRepositoryButton");
 const refreshRepositoryButton = document.querySelector("#refreshRepositoryButton");
 const repositoryStatus = document.querySelector("#repositoryStatus");
 const repositoryList = document.querySelector("#repositoryList");
+const compareResult = document.querySelector("#compareResult");
 const routeLinks = [...document.querySelectorAll("[data-route-link]")];
 
 let currentPackage = null;
+let currentValidationReport = null;
 let currentFileName = "aas-export";
 let pendingTableImport = null;
 let gatewayMappingCounter = 1;
 let submodelCounter = 1;
 let propertyCounter = 1;
 let repositoryAssets = [];
+let explorerNodes = new Map();
+let selectedExplorerNodeId = "package";
+let expandedExplorerNodeIds = new Set(["package"]);
+let lastExplorerQuery = "";
 
 const targetColumns = [
   { key: "assetId", label: "Asset ID", required: true, aliases: ["assetid", "asset id", "globalassetid", "global asset id"] },
@@ -50,6 +66,117 @@ const targetColumns = [
   { key: "semanticId", label: "Semantic ID", required: false, aliases: ["semanticid", "semantic id", "irdi", "concept"] },
   { key: "unit", label: "Unit", required: false, aliases: ["unit", "einheit", "uom"] },
 ];
+
+const nestedModelSearchKeys = new Set([
+  "assetAdministrationShells",
+  "submodels",
+  "conceptDescriptions",
+  "submodelElements",
+  "statements",
+  "value",
+]);
+
+const aasModelTypes = new Set([
+  "AssetAdministrationShell",
+  "Submodel",
+  "ConceptDescription",
+  "Property",
+  "MultiLanguageProperty",
+  "Range",
+  "Blob",
+  "File",
+  "ReferenceElement",
+  "RelationshipElement",
+  "AnnotatedRelationshipElement",
+  "Entity",
+  "SubmodelElementCollection",
+  "SubmodelElementList",
+  "Operation",
+  "Capability",
+  "BasicEventElement",
+]);
+
+const submodelElementTypes = new Set([
+  "AnnotatedRelationshipElement",
+  "BasicEventElement",
+  "Blob",
+  "Capability",
+  "Entity",
+  "File",
+  "MultiLanguageProperty",
+  "Operation",
+  "Property",
+  "Range",
+  "ReferenceElement",
+  "RelationshipElement",
+  "SubmodelElementCollection",
+  "SubmodelElementList",
+]);
+
+const aasReferenceTypes = new Set(["ExternalReference", "ModelReference"]);
+
+const aasKeyTypes = new Set([
+  "AnnotatedRelationshipElement",
+  "AssetAdministrationShell",
+  "BasicEventElement",
+  "Blob",
+  "Capability",
+  "ConceptDescription",
+  "Entity",
+  "File",
+  "FragmentReference",
+  "GlobalReference",
+  "Identifiable",
+  "MultiLanguageProperty",
+  "Operation",
+  "Property",
+  "Range",
+  "Referable",
+  "ReferenceElement",
+  "RelationshipElement",
+  "Submodel",
+  "SubmodelElement",
+  "SubmodelElementCollection",
+  "SubmodelElementList",
+]);
+
+const aasValueTypes = new Set([
+  "xs:anyURI",
+  "xs:base64Binary",
+  "xs:boolean",
+  "xs:byte",
+  "xs:date",
+  "xs:dateTime",
+  "xs:decimal",
+  "xs:double",
+  "xs:duration",
+  "xs:float",
+  "xs:gDay",
+  "xs:gMonth",
+  "xs:gMonthDay",
+  "xs:gYear",
+  "xs:gYearMonth",
+  "xs:hexBinary",
+  "xs:int",
+  "xs:integer",
+  "xs:long",
+  "xs:negativeInteger",
+  "xs:nonNegativeInteger",
+  "xs:nonPositiveInteger",
+  "xs:positiveInteger",
+  "xs:short",
+  "xs:string",
+  "xs:time",
+  "xs:unsignedByte",
+  "xs:unsignedInt",
+  "xs:unsignedLong",
+  "xs:unsignedShort",
+]);
+
+const assetKinds = new Set(["Instance", "Type", "NotApplicable", "Role"]);
+const entityTypes = new Set(["CoManagedEntity", "SelfManagedEntity"]);
+const eventDirections = new Set(["input", "output"]);
+const eventStates = new Set(["on", "off"]);
 
 const sampleCsv = `assetId,assetName,submodelId,submodelName,idShort,valueType,value,semanticId,unit
 urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:TechnicalData,Technical Data,Manufacturer,string,ACME Industrial,https://admin-shell.io/idta/Manufacturer,
@@ -71,6 +198,7 @@ addSubmodelEditor({
     },
   ],
 });
+updateTreeControls(false);
 
 fileInput.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
@@ -143,8 +271,81 @@ downloadAasxButton.addEventListener("click", () => {
   downloadBlob(createAasxBlob(currentPackage), `${currentFileName}.aasx`);
 });
 
+downloadPdfButton.addEventListener("click", () => {
+  if (!currentPackage) return;
+  downloadBlob(
+    createAasPdfBlob(currentPackage, {
+      fileName: currentFileName,
+      validationReport: currentValidationReport,
+      generatedAt: new Date(),
+    }),
+    `${currentFileName}-report.pdf`,
+  );
+});
+
+downloadExcelButton.addEventListener("click", () => {
+  if (!currentPackage) return;
+  downloadBlob(
+    createAasExcelBlob(currentPackage, {
+      fileName: currentFileName,
+      validationReport: currentValidationReport,
+      generatedAt: new Date(),
+    }),
+    `${currentFileName}-export.xlsx`,
+  );
+});
+
 searchInput.addEventListener("input", () => {
   if (currentPackage) renderExplorer(currentPackage, searchInput.value);
+});
+
+explorer.addEventListener("click", (event) => {
+  const toggleButton = event.target.closest("[data-tree-toggle]");
+  if (toggleButton) {
+    const nodeId = toggleButton.dataset.treeToggle;
+    if (expandedExplorerNodeIds.has(nodeId)) {
+      expandedExplorerNodeIds.delete(nodeId);
+    } else {
+      expandedExplorerNodeIds.add(nodeId);
+    }
+    renderExplorer(currentPackage, searchInput.value);
+    return;
+  }
+
+  const selectButton = event.target.closest("[data-node-id]");
+  if (!selectButton) return;
+  selectedExplorerNodeId = selectButton.dataset.nodeId;
+  renderExplorer(currentPackage, searchInput.value);
+});
+
+expandTreeButton.addEventListener("click", () => {
+  if (!currentPackage) return;
+  explorerNodes.forEach((node) => {
+    if (node.children.length > 0) expandedExplorerNodeIds.add(node.id);
+  });
+  renderExplorer(currentPackage, searchInput.value);
+});
+
+collapseTreeButton.addEventListener("click", () => {
+  if (!currentPackage) return;
+  expandedExplorerNodeIds = new Set(["package"]);
+  renderExplorer(currentPackage, searchInput.value);
+});
+
+copyJsonButton.addEventListener("click", async () => {
+  const node = explorerNodes.get(selectedExplorerNodeId);
+  if (!node) return;
+
+  const originalText = copyJsonButton.textContent;
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(node.value, null, 2));
+    copyJsonButton.textContent = "Kopiert";
+  } catch {
+    copyJsonButton.textContent = "Nicht kopiert";
+  }
+  window.setTimeout(() => {
+    copyJsonButton.textContent = originalText;
+  }, 1200);
 });
 
 repositoryForm.addEventListener("submit", async (event) => {
@@ -156,8 +357,18 @@ refreshRepositoryButton.addEventListener("click", refreshRepository);
 
 repositoryList.addEventListener("click", async (event) => {
   const loadVersionButton = event.target.closest("[data-action='load-version']");
-  if (!loadVersionButton) return;
-  await loadRepositoryVersion(loadVersionButton.dataset.assetId, loadVersionButton.dataset.version);
+  if (loadVersionButton) {
+    await loadRepositoryVersion(loadVersionButton.dataset.assetId, loadVersionButton.dataset.version);
+    return;
+  }
+
+  const compareButton = event.target.closest("[data-action='compare-versions']");
+  if (!compareButton) return;
+
+  const controls = compareButton.closest("[data-compare-asset]");
+  const baseVersion = controls.querySelector("[data-compare-base]").value;
+  const targetVersion = controls.querySelector("[data-compare-target]").value;
+  await compareRepositoryVersions(controls.dataset.compareAsset, baseVersion, targetVersion);
 });
 
 manualGeneratorForm.addEventListener("submit", (event) => {
@@ -388,12 +599,23 @@ function buildPackageFromGenerator() {
 
 function loadPackage(aasPackage) {
   currentPackage = aasPackage;
+  resetExplorerState();
   const report = validateAasPackage(aasPackage);
+  currentValidationReport = report;
   renderValidation(report);
   renderExplorer(aasPackage, searchInput.value);
   downloadButton.disabled = false;
   downloadAasxButton.disabled = false;
+  downloadPdfButton.disabled = false;
+  downloadExcelButton.disabled = false;
   saveRepositoryButton.disabled = false;
+}
+
+function resetExplorerState() {
+  selectedExplorerNodeId = "package";
+  expandedExplorerNodeIds = new Set(["package"]);
+  explorerNodes = new Map();
+  lastExplorerQuery = "";
 }
 
 async function saveCurrentPackageToRepository() {
@@ -446,6 +668,34 @@ async function loadRepositoryVersion(assetId, version) {
   }
 }
 
+async function compareRepositoryVersions(assetId, baseVersion, targetVersion) {
+  if (baseVersion === targetVersion) {
+    compareResult.className = "compare-empty";
+    compareResult.textContent = "Waehle zwei unterschiedliche Versionen aus.";
+    return;
+  }
+
+  try {
+    compareResult.className = "compare-empty";
+    compareResult.textContent = `Vergleich v${baseVersion} gegen v${targetVersion} wird geladen ...`;
+    const [base, target] = await Promise.all([
+      fetchRepositoryVersion(assetId, baseVersion),
+      fetchRepositoryVersion(assetId, targetVersion),
+    ]);
+    const comparison = compareAasPackages(normalizeAasJson(base.payload), normalizeAasJson(target.payload));
+    renderCompareResult(base, target, comparison);
+    repositoryStatus.textContent = `Vergleich geladen: ${base.asset.idShort}, v${base.version} gegen v${target.version}.`;
+  } catch (error) {
+    compareResult.className = "compare-empty";
+    compareResult.textContent = `Vergleich konnte nicht geladen werden: ${error.message}`;
+  }
+}
+
+async function fetchRepositoryVersion(assetId, version) {
+  const response = await fetch(`/api/aas/${encodeURIComponent(assetId)}/versions/${encodeURIComponent(version)}`);
+  return readApiResponse(response);
+}
+
 async function readApiResponse(response) {
   const payload = await response.json();
   if (!response.ok) {
@@ -462,6 +712,27 @@ function renderRepositoryList(assets) {
 
 function renderRepositoryCard(asset) {
   const versions = Array.from({ length: asset.latestVersion }, (_, index) => index + 1);
+  const compareControls =
+    versions.length > 1
+      ? `
+        <div class="compare-controls" data-compare-asset="${escapeHtml(asset.id)}">
+          <label>
+            <span>Basis</span>
+            <select data-compare-base>
+              ${renderVersionOptions(versions, Math.max(1, asset.latestVersion - 1))}
+            </select>
+          </label>
+          <label>
+            <span>Ziel</span>
+            <select data-compare-target>
+              ${renderVersionOptions(versions, asset.latestVersion)}
+            </select>
+          </label>
+          <button class="secondary-button" type="button" data-action="compare-versions">Vergleichen</button>
+        </div>
+      `
+      : `<div class="repository-meta">Fuer Compare mindestens zwei Versionen speichern.</div>`;
+
   return `
     <article class="repository-card">
       <h3>${escapeHtml(asset.idShort)}</h3>
@@ -475,7 +746,290 @@ function renderRepositoryCard(asset) {
           )
           .join("")}
       </div>
+      ${compareControls}
     </article>
+  `;
+}
+
+function renderVersionOptions(versions, selectedVersion) {
+  return versions
+    .map((version) => `<option value="${version}"${version === selectedVersion ? " selected" : ""}>v${version}</option>`)
+    .join("");
+}
+
+function compareAasPackages(basePackage, targetPackage) {
+  const baseEntries = buildCompareEntries(basePackage);
+  const targetEntries = buildCompareEntries(targetPackage);
+  const result = {
+    added: [],
+    removed: [],
+    changed: [],
+    unchanged: [],
+    baseStats: getPackageCompareStats(basePackage),
+    targetStats: getPackageCompareStats(targetPackage),
+  };
+
+  const keys = [...new Set([...baseEntries.keys(), ...targetEntries.keys()])].sort((left, right) => {
+    const leftEntry = baseEntries.get(left) ?? targetEntries.get(left);
+    const rightEntry = baseEntries.get(right) ?? targetEntries.get(right);
+    return leftEntry.sortKey.localeCompare(rightEntry.sortKey);
+  });
+
+  for (const key of keys) {
+    const baseEntry = baseEntries.get(key);
+    const targetEntry = targetEntries.get(key);
+
+    if (!baseEntry && targetEntry) {
+      result.added.push(targetEntry);
+      continue;
+    }
+
+    if (baseEntry && !targetEntry) {
+      result.removed.push(baseEntry);
+      continue;
+    }
+
+    if (stableJson(baseEntry.compareValue) !== stableJson(targetEntry.compareValue)) {
+      result.changed.push({
+        ...targetEntry,
+        before: baseEntry,
+        changes: diffComparableValues(baseEntry.compareValue, targetEntry.compareValue),
+      });
+      continue;
+    }
+
+    result.unchanged.push(targetEntry);
+  }
+
+  return result;
+}
+
+function buildCompareEntries(aasPackage) {
+  const entries = new Map();
+  const shells = aasPackage.assetAdministrationShells ?? [];
+  const submodels = aasPackage.submodels ?? [];
+
+  shells.forEach((shell, shellIndex) => {
+    const shellKey = shell.id || `index:${shellIndex}`;
+    addCompareEntry(entries, {
+      type: "AAS",
+      key: `shell:${shellKey}`,
+      label: shell.idShort ?? `AAS ${shellIndex + 1}`,
+      path: shell.id ?? `assetAdministrationShells[${shellIndex}]`,
+      sortKey: `0:${shell.idShort ?? shellKey}`,
+      compareValue: comparableShell(shell),
+    });
+  });
+
+  submodels.forEach((submodel, submodelIndex) => {
+    const submodelKey = submodel.id || `index:${submodelIndex}`;
+    addCompareEntry(entries, {
+      type: "Submodel",
+      key: `submodel:${submodelKey}`,
+      label: submodel.idShort ?? `Submodel ${submodelIndex + 1}`,
+      path: submodel.id ?? `submodels[${submodelIndex}]`,
+      sortKey: `1:${submodel.idShort ?? submodelKey}`,
+      compareValue: comparableSubmodel(submodel),
+    });
+
+    (submodel.submodelElements ?? []).forEach((element, elementIndex) => {
+      addElementCompareEntries(entries, element, submodelKey, submodel.idShort ?? submodelKey, [elementIndex], []);
+    });
+  });
+
+  return entries;
+}
+
+function addElementCompareEntries(entries, element, submodelKey, submodelLabel, indexPath, labelPath) {
+  const labelSegment = element.idShort || `Element${indexPath.at(-1) + 1}`;
+  const nextLabelPath = [...labelPath, labelSegment];
+  const elementKey = `element:${submodelKey}:${nextLabelPath.join("/")}`;
+  const label = nextLabelPath.join(" / ");
+
+  addCompareEntry(entries, {
+    type: element.modelType ?? "Element",
+    key: elementKey,
+    label,
+    path: `${submodelLabel} / ${label}`,
+    sortKey: `2:${submodelLabel}:${nextLabelPath.join(":")}`,
+    compareValue: comparableElement(element),
+  });
+
+  getElementChildren(element).forEach((child, childIndex) => {
+    addElementCompareEntries(entries, child, submodelKey, submodelLabel, [...indexPath, childIndex], nextLabelPath);
+  });
+}
+
+function addCompareEntry(entries, entry) {
+  entries.set(entry.key, entry);
+}
+
+function comparableShell(shell) {
+  return {
+    ...cloneComparable(omitKeys(shell, ["submodels"])),
+    submodelReferences: (shell.submodels ?? []).map((reference) => reference.keys?.at(-1)?.value ?? reference),
+  };
+}
+
+function comparableSubmodel(submodel) {
+  return cloneComparable(omitKeys(submodel, ["submodelElements"]));
+}
+
+function comparableElement(element) {
+  const childEntries = getElementChildren(element);
+  const keysToOmit = childEntries.length ? ["value", "statements"] : [];
+  return cloneComparable(omitKeys(element, keysToOmit));
+}
+
+function omitKeys(entity, keys) {
+  const skipped = new Set(keys);
+  return Object.fromEntries(Object.entries(entity ?? {}).filter(([key]) => !skipped.has(key)));
+}
+
+function cloneComparable(value) {
+  const text = JSON.stringify(value);
+  return text ? JSON.parse(text) : null;
+}
+
+function getPackageCompareStats(aasPackage) {
+  const submodels = aasPackage.submodels ?? [];
+  return {
+    shells: aasPackage.assetAdministrationShells?.length ?? 0,
+    submodels: submodels.length,
+    elements: countSubmodelElements(submodels),
+  };
+}
+
+function diffComparableValues(baseValue, targetValue) {
+  const baseFlat = flattenComparableValue(baseValue);
+  const targetFlat = flattenComparableValue(targetValue);
+  return [...new Set([...baseFlat.keys(), ...targetFlat.keys()])]
+    .sort()
+    .filter((path) => baseFlat.get(path) !== targetFlat.get(path))
+    .map((path) => ({
+      path,
+      before: baseFlat.has(path) ? baseFlat.get(path) : "nicht gesetzt",
+      after: targetFlat.has(path) ? targetFlat.get(path) : "nicht gesetzt",
+    }));
+}
+
+function flattenComparableValue(value, path = "", output = new Map()) {
+  if (value === null || typeof value !== "object") {
+    output.set(path || "value", formatCompareValue(value));
+    return output;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      output.set(path || "value", "[]");
+      return output;
+    }
+    value.forEach((entry, index) => flattenComparableValue(entry, `${path}[${index}]`, output));
+    return output;
+  }
+
+  const keys = Object.keys(value).sort();
+  if (keys.length === 0) {
+    output.set(path || "value", "{}");
+    return output;
+  }
+
+  keys.forEach((key) => {
+    const nextPath = path ? `${path}.${key}` : key;
+    flattenComparableValue(value[key], nextPath, output);
+  });
+  return output;
+}
+
+function formatCompareValue(value) {
+  if (value === undefined) return "nicht gesetzt";
+  if (value === null) return "null";
+  if (value === "") return "leer";
+  return String(value);
+}
+
+function stableJson(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  return `{${Object.keys(value)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+    .join(",")}}`;
+}
+
+function renderCompareResult(base, target, comparison) {
+  const changedCount = comparison.added.length + comparison.removed.length + comparison.changed.length;
+  compareResult.className = "compare-result";
+  compareResult.innerHTML = `
+    <div class="compare-header">
+      <div>
+        <h3>${escapeHtml(base.asset.idShort)}: v${base.version} gegen v${target.version}</h3>
+        <div class="repository-meta">${escapeHtml(base.asset.globalAssetId)}</div>
+      </div>
+      <span class="status-pill ${changedCount ? "warning" : "valid"}">${changedCount ? `${changedCount} Unterschiede` : "Keine Unterschiede"}</span>
+    </div>
+    <div class="compare-version-meta">
+      <div><strong>Basis v${base.version}</strong><span>${formatDateTime(base.createdAt)} | ${escapeHtml(base.changeReason)}</span></div>
+      <div><strong>Ziel v${target.version}</strong><span>${formatDateTime(target.createdAt)} | ${escapeHtml(target.changeReason)}</span></div>
+    </div>
+    <div class="compare-summary-grid">
+      ${renderCompareSummary("AAS", comparison.baseStats.shells, comparison.targetStats.shells)}
+      ${renderCompareSummary("Submodels", comparison.baseStats.submodels, comparison.targetStats.submodels)}
+      ${renderCompareSummary("Elements", comparison.baseStats.elements, comparison.targetStats.elements)}
+      <div><strong>${comparison.unchanged.length}</strong><span>Unveraendert</span></div>
+    </div>
+    <div class="compare-groups">
+      ${renderCompareGroup("Geaendert", comparison.changed, "changed")}
+      ${renderCompareGroup("Hinzugefuegt", comparison.added, "added")}
+      ${renderCompareGroup("Entfernt", comparison.removed, "removed")}
+    </div>
+  `;
+}
+
+function renderCompareSummary(label, baseValue, targetValue) {
+  const changed = baseValue !== targetValue;
+  return `
+    <div class="${changed ? "changed" : ""}">
+      <strong>${escapeHtml(baseValue)} -> ${escapeHtml(targetValue)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>
+  `;
+}
+
+function renderCompareGroup(title, entries, kind) {
+  return `
+    <section class="compare-group">
+      <h3>${escapeHtml(title)} <span>${entries.length}</span></h3>
+      ${
+        entries.length
+          ? entries.slice(0, 50).map((entry) => renderCompareItem(entry, kind)).join("")
+          : `<div class="compare-empty-row">Keine Eintraege.</div>`
+      }
+      ${entries.length > 50 ? `<div class="compare-empty-row">${entries.length - 50} weitere Eintraege ausgeblendet.</div>` : ""}
+    </section>
+  `;
+}
+
+function renderCompareItem(entry, kind) {
+  return `
+    <article class="compare-item ${kind}">
+      <div class="compare-item-head">
+        <strong>${escapeHtml(entry.label)}</strong>
+        <span>${escapeHtml(entry.type)} | ${escapeHtml(entry.path)}</span>
+      </div>
+      ${entry.changes?.length ? `<div class="field-diff-list">${entry.changes.slice(0, 12).map(renderFieldDiff).join("")}</div>` : ""}
+      ${entry.changes?.length > 12 ? `<div class="compare-empty-row">${entry.changes.length - 12} weitere Feldunterschiede.</div>` : ""}
+    </article>
+  `;
+}
+
+function renderFieldDiff(change) {
+  return `
+    <div class="field-diff">
+      <code>${escapeHtml(change.path)}</code>
+      <span>${escapeHtml(change.before)}</span>
+      <span>${escapeHtml(change.after)}</span>
+    </div>
   `;
 }
 
@@ -948,13 +1502,16 @@ function columnReferenceToIndex(reference) {
 
 function validateAasPackage(aasPackage) {
   const issues = [];
-  const shells = aasPackage.assetAdministrationShells ?? [];
-  const submodels = aasPackage.submodels ?? [];
+  if (!aasPackage || typeof aasPackage !== "object") {
+    issues.push(errorIssue("Package", "AAS-Package muss ein JSON-Objekt sein."));
+    return { issues, stats: { shells: 0, submodels: 0, elements: 0 } };
+  }
+
+  const shells = Array.isArray(aasPackage.assetAdministrationShells) ? aasPackage.assetAdministrationShells : [];
+  const submodels = Array.isArray(aasPackage.submodels) ? aasPackage.submodels : [];
+  const conceptDescriptions = Array.isArray(aasPackage.conceptDescriptions) ? aasPackage.conceptDescriptions : [];
   const submodelIds = new Set(submodels.map((submodel) => submodel.id).filter(Boolean));
-  const elementCount = submodels.reduce(
-    (count, submodel) => count + (submodel.submodelElements?.length ?? 0),
-    0,
-  );
+  const elementCount = countSubmodelElements(submodels);
 
   if (!Array.isArray(aasPackage.assetAdministrationShells)) {
     issues.push(errorIssue("Package", "assetAdministrationShells muss ein Array sein."));
@@ -964,58 +1521,70 @@ function validateAasPackage(aasPackage) {
     issues.push(errorIssue("Package", "submodels muss ein Array sein."));
   }
 
+  if (aasPackage.conceptDescriptions !== undefined && !Array.isArray(aasPackage.conceptDescriptions)) {
+    issues.push(errorIssue("Package", "conceptDescriptions muss ein Array sein."));
+  }
+
   shells.forEach((shell, shellIndex) => {
     const path = `assetAdministrationShells[${shellIndex}]`;
+    if (!isPlainObject(shell)) {
+      issues.push(errorIssue(path, "AssetAdministrationShell muss ein Objekt sein."));
+      return;
+    }
+
+    validateModelType(shell, "AssetAdministrationShell", path, issues);
     requireField(shell, "id", path, issues);
     requireField(shell, "idShort", path, issues);
+    validateIdShort(shell.idShort, `${path}.idShort`, issues);
+    validateAssetInformation(shell.assetInformation, `${path}.assetInformation`, issues);
 
-    if (!shell.assetInformation?.globalAssetId) {
-      issues.push(warnIssue(path, "assetInformation.globalAssetId fehlt."));
+    if (shell.submodels !== undefined && !Array.isArray(shell.submodels)) {
+      issues.push(errorIssue(`${path}.submodels`, "Submodel-Referenzen muessen ein Array sein."));
     }
 
-    if (!isValidIdShort(shell.idShort)) {
-      issues.push(errorIssue(path, `idShort "${shell.idShort}" ist nicht AAS-kompatibel.`));
-    }
-
-    for (const reference of shell.submodels ?? []) {
+    for (const [referenceIndex, reference] of (Array.isArray(shell.submodels) ? shell.submodels : []).entries()) {
+      const referencePath = `${path}.submodels[${referenceIndex}]`;
+      validateReference(reference, referencePath, issues, {
+        expectedKeyType: "Submodel",
+        expectedReferenceType: "ModelReference",
+      });
       const target = reference.keys?.at(-1)?.value;
       if (target && !submodelIds.has(target)) {
-        issues.push(errorIssue(path, `Submodel-Referenz nicht gefunden: ${target}`));
+        issues.push(errorIssue(referencePath, `Submodel-Referenz nicht gefunden: ${target}`));
       }
     }
   });
 
   submodels.forEach((submodel, submodelIndex) => {
     const path = `submodels[${submodelIndex}]`;
+    if (!isPlainObject(submodel)) {
+      issues.push(errorIssue(path, "Submodel muss ein Objekt sein."));
+      return;
+    }
+
+    validateModelType(submodel, "Submodel", path, issues);
     requireField(submodel, "id", path, issues);
     requireField(submodel, "idShort", path, issues);
+    validateIdShort(submodel.idShort, `${path}.idShort`, issues);
+    validateReferenceIfPresent(submodel.semanticId, `${path}.semanticId`, issues);
 
-    if (!isValidIdShort(submodel.idShort)) {
-      issues.push(errorIssue(path, `idShort "${submodel.idShort}" ist nicht AAS-kompatibel.`));
+    if (submodel.submodelElements !== undefined && !Array.isArray(submodel.submodelElements)) {
+      issues.push(errorIssue(`${path}.submodelElements`, "submodelElements muss ein Array sein."));
+    } else {
+      validateSubmodelElements(submodel.submodelElements ?? [], `${path}.submodelElements`, issues);
+    }
+  });
+
+  conceptDescriptions.forEach((conceptDescription, conceptIndex) => {
+    const path = `conceptDescriptions[${conceptIndex}]`;
+    if (!isPlainObject(conceptDescription)) {
+      issues.push(errorIssue(path, "ConceptDescription muss ein Objekt sein."));
+      return;
     }
 
-    const seenElements = new Set();
-    for (const [elementIndex, element] of (submodel.submodelElements ?? []).entries()) {
-      const elementPath = `${path}.submodelElements[${elementIndex}]`;
-      requireField(element, "idShort", elementPath, issues);
-
-      if (!isValidIdShort(element.idShort)) {
-        issues.push(errorIssue(elementPath, `idShort "${element.idShort}" ist nicht AAS-kompatibel.`));
-      }
-
-      if (seenElements.has(element.idShort)) {
-        issues.push(warnIssue(elementPath, `Doppeltes idShort im Submodel: ${element.idShort}`));
-      }
-      seenElements.add(element.idShort);
-
-      if (element.modelType === "Property" && !element.valueType) {
-        issues.push(errorIssue(elementPath, "Property ohne valueType."));
-      }
-
-      if (!element.semanticId) {
-        issues.push(warnIssue(elementPath, "semanticId fehlt; Interoperabilitaet ist eingeschraenkt."));
-      }
-    }
+    validateModelType(conceptDescription, "ConceptDescription", path, issues);
+    requireField(conceptDescription, "id", path, issues);
+    if (conceptDescription.idShort) validateIdShort(conceptDescription.idShort, `${path}.idShort`, issues);
   });
 
   return {
@@ -1026,6 +1595,456 @@ function validateAasPackage(aasPackage) {
       elements: elementCount,
     },
   };
+}
+
+function validateModelType(entity, expectedModelType, path, issues) {
+  if (!entity.modelType) {
+    issues.push(errorIssue(path, `modelType fehlt; erwartet wird "${expectedModelType}".`));
+    return;
+  }
+
+  if (!aasModelTypes.has(entity.modelType)) {
+    issues.push(errorIssue(path, `Unbekannter modelType "${entity.modelType}".`));
+    return;
+  }
+
+  if (entity.modelType !== expectedModelType) {
+    issues.push(errorIssue(path, `modelType muss "${expectedModelType}" sein, ist aber "${entity.modelType}".`));
+  }
+}
+
+function validateSubmodelElements(elements, path, issues, options = {}) {
+  if (!Array.isArray(elements)) {
+    issues.push(errorIssue(path, "Submodel-Elemente muessen ein Array sein."));
+    return;
+  }
+
+  const seenElements = new Set();
+  elements.forEach((element, elementIndex) => {
+    const elementPath = `${path}[${elementIndex}]`;
+    if (options.enforceUniqueIdShort !== false && typeof element?.idShort === "string") {
+      if (seenElements.has(element.idShort)) {
+        issues.push(warnIssue(elementPath, `Doppeltes idShort in diesem Kontext: ${element.idShort}`));
+      }
+      seenElements.add(element.idShort);
+    }
+    validateSubmodelElement(element, elementPath, issues, options);
+  });
+}
+
+function validateSubmodelElement(element, path, issues, options = {}) {
+  if (!isPlainObject(element)) {
+    issues.push(errorIssue(path, "Submodel-Element muss ein Objekt sein."));
+    return;
+  }
+
+  if (!element.modelType) {
+    issues.push(errorIssue(path, "modelType fehlt."));
+  } else if (!submodelElementTypes.has(element.modelType)) {
+    issues.push(errorIssue(path, `modelType "${element.modelType}" ist kein AAS-3.x-SubmodelElement.`));
+  }
+
+  if (options.requireIdShort === false) {
+    if (element.idShort) validateIdShort(element.idShort, `${path}.idShort`, issues);
+  } else {
+    requireField(element, "idShort", path, issues);
+    validateIdShort(element.idShort, `${path}.idShort`, issues);
+  }
+
+  if (element.semanticId) {
+    validateReference(element.semanticId, `${path}.semanticId`, issues);
+  } else {
+    issues.push(warnIssue(path, "semanticId fehlt; Interoperabilitaet ist eingeschraenkt."));
+  }
+
+  validateQualifiers(element.qualifiers, `${path}.qualifiers`, issues);
+
+  switch (element.modelType) {
+    case "Property":
+      validateProperty(element, path, issues);
+      break;
+    case "MultiLanguageProperty":
+      validateMultiLanguageProperty(element, path, issues);
+      break;
+    case "Range":
+      validateRange(element, path, issues);
+      break;
+    case "Blob":
+    case "File":
+      validateContentElement(element, path, issues);
+      break;
+    case "ReferenceElement":
+      validateReferenceIfPresent(element.value, `${path}.value`, issues);
+      break;
+    case "RelationshipElement":
+    case "AnnotatedRelationshipElement":
+      validateRelationshipElement(element, path, issues);
+      break;
+    case "Entity":
+      validateEntity(element, path, issues);
+      break;
+    case "SubmodelElementCollection":
+      validateCollection(element, path, issues);
+      break;
+    case "SubmodelElementList":
+      validateElementList(element, path, issues);
+      break;
+    case "Operation":
+      validateOperation(element, path, issues);
+      break;
+    case "BasicEventElement":
+      validateBasicEventElement(element, path, issues);
+      break;
+    default:
+      break;
+  }
+}
+
+function validateProperty(element, path, issues) {
+  if (!element.valueType) {
+    issues.push(errorIssue(path, "Property ohne valueType."));
+    return;
+  }
+
+  validateValueType(element.valueType, `${path}.valueType`, issues);
+  validatePropertyValueByType(element.value, element.valueType, `${path}.value`, issues);
+}
+
+function validateRange(element, path, issues) {
+  if (!element.valueType) {
+    issues.push(errorIssue(path, "Range ohne valueType."));
+    return;
+  }
+
+  validateValueType(element.valueType, `${path}.valueType`, issues);
+  validatePropertyValueByType(element.min, element.valueType, `${path}.min`, issues);
+  validatePropertyValueByType(element.max, element.valueType, `${path}.max`, issues);
+}
+
+function validateMultiLanguageProperty(element, path, issues) {
+  if (element.value === undefined) return;
+  if (!Array.isArray(element.value)) {
+    issues.push(errorIssue(`${path}.value`, "MultiLanguageProperty.value muss ein Array sein."));
+    return;
+  }
+
+  element.value.forEach((entry, entryIndex) => {
+    const entryPath = `${path}.value[${entryIndex}]`;
+    if (!isPlainObject(entry)) {
+      issues.push(errorIssue(entryPath, "LangString muss ein Objekt sein."));
+      return;
+    }
+    requireField(entry, "language", entryPath, issues);
+    requireField(entry, "text", entryPath, issues);
+    if (entry.language && !/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(entry.language)) {
+      issues.push(warnIssue(`${entryPath}.language`, `language "${entry.language}" sieht nicht wie ein BCP-47-Tag aus.`));
+    }
+  });
+}
+
+function validateContentElement(element, path, issues) {
+  if (!element.contentType) {
+    issues.push(errorIssue(path, `${element.modelType} braucht contentType.`));
+  } else if (typeof element.contentType !== "string") {
+    issues.push(errorIssue(`${path}.contentType`, "contentType muss ein String sein."));
+  }
+}
+
+function validateRelationshipElement(element, path, issues) {
+  validateRequiredReference(element.first, `${path}.first`, issues);
+  validateRequiredReference(element.second, `${path}.second`, issues);
+
+  if (element.modelType === "AnnotatedRelationshipElement") {
+    if (element.annotations !== undefined && !Array.isArray(element.annotations)) {
+      issues.push(errorIssue(`${path}.annotations`, "annotations muss ein Array sein."));
+    } else {
+      validateSubmodelElements(element.annotations ?? [], `${path}.annotations`, issues);
+    }
+  }
+}
+
+function validateEntity(element, path, issues) {
+  if (!element.entityType) {
+    issues.push(errorIssue(path, "Entity ohne entityType."));
+  } else if (!entityTypes.has(element.entityType)) {
+    issues.push(errorIssue(`${path}.entityType`, `entityType "${element.entityType}" ist nicht gueltig.`));
+  }
+
+  if (element.statements !== undefined && !Array.isArray(element.statements)) {
+    issues.push(errorIssue(`${path}.statements`, "statements muss ein Array sein."));
+  } else {
+    validateSubmodelElements(element.statements ?? [], `${path}.statements`, issues);
+  }
+
+  if (element.entityType === "SelfManagedEntity" && !element.globalAssetId && !element.specificAssetIds) {
+    issues.push(warnIssue(path, "SelfManagedEntity sollte globalAssetId oder specificAssetIds setzen."));
+  }
+}
+
+function validateCollection(element, path, issues) {
+  if (element.value !== undefined && !Array.isArray(element.value)) {
+    issues.push(errorIssue(`${path}.value`, "SubmodelElementCollection.value muss ein Array sein."));
+    return;
+  }
+
+  validateSubmodelElements(element.value ?? [], `${path}.value`, issues);
+}
+
+function validateElementList(element, path, issues) {
+  if (element.value !== undefined && !Array.isArray(element.value)) {
+    issues.push(errorIssue(`${path}.value`, "SubmodelElementList.value muss ein Array sein."));
+    return;
+  }
+
+  if (!element.typeValueList) {
+    issues.push(warnIssue(path, "SubmodelElementList ohne typeValueList ist schwer interoperabel."));
+  } else if (!submodelElementTypes.has(element.typeValueList)) {
+    issues.push(errorIssue(`${path}.typeValueList`, `typeValueList "${element.typeValueList}" ist nicht gueltig.`));
+  }
+
+  validateSubmodelElements(element.value ?? [], `${path}.value`, issues, {
+    requireIdShort: false,
+    enforceUniqueIdShort: false,
+  });
+
+  if (element.typeValueList) {
+    (element.value ?? []).forEach((child, childIndex) => {
+      if (child?.modelType && child.modelType !== element.typeValueList) {
+        issues.push(
+          errorIssue(
+            `${path}.value[${childIndex}]`,
+            `Listenelement muss modelType "${element.typeValueList}" haben, ist aber "${child.modelType}".`,
+          ),
+        );
+      }
+    });
+  }
+}
+
+function validateOperation(element, path, issues) {
+  validateOperationVariables(element.inputVariables, `${path}.inputVariables`, issues);
+  validateOperationVariables(element.outputVariables, `${path}.outputVariables`, issues);
+  validateOperationVariables(element.inoutputVariables, `${path}.inoutputVariables`, issues);
+}
+
+function validateOperationVariables(variables, path, issues) {
+  if (variables === undefined) return;
+  if (!Array.isArray(variables)) {
+    issues.push(errorIssue(path, "OperationVariables muessen ein Array sein."));
+    return;
+  }
+
+  variables.forEach((variable, variableIndex) => {
+    const variablePath = `${path}[${variableIndex}]`;
+    if (!isPlainObject(variable)) {
+      issues.push(errorIssue(variablePath, "OperationVariable muss ein Objekt sein."));
+      return;
+    }
+    if (!variable.value) {
+      issues.push(errorIssue(variablePath, "OperationVariable.value fehlt."));
+    } else {
+      validateSubmodelElement(variable.value, `${variablePath}.value`, issues, { requireIdShort: false });
+    }
+  });
+}
+
+function validateBasicEventElement(element, path, issues) {
+  validateRequiredReference(element.observed, `${path}.observed`, issues, { expectedReferenceType: "ModelReference" });
+
+  if (element.direction && !eventDirections.has(element.direction)) {
+    issues.push(errorIssue(`${path}.direction`, `direction "${element.direction}" ist nicht gueltig.`));
+  }
+
+  if (element.state && !eventStates.has(element.state)) {
+    issues.push(errorIssue(`${path}.state`, `state "${element.state}" ist nicht gueltig.`));
+  }
+}
+
+function validateAssetInformation(assetInformation, path, issues) {
+  if (!isPlainObject(assetInformation)) {
+    issues.push(errorIssue(path, "assetInformation fehlt oder ist kein Objekt."));
+    return;
+  }
+
+  if (!assetInformation.assetKind) {
+    issues.push(errorIssue(path, "assetKind fehlt."));
+  } else if (!assetKinds.has(assetInformation.assetKind)) {
+    issues.push(errorIssue(`${path}.assetKind`, `assetKind "${assetInformation.assetKind}" ist nicht gueltig.`));
+  }
+
+  if (!assetInformation.globalAssetId) {
+    issues.push(warnIssue(path, "globalAssetId fehlt."));
+  }
+
+  if (assetInformation.specificAssetIds !== undefined && !Array.isArray(assetInformation.specificAssetIds)) {
+    issues.push(errorIssue(`${path}.specificAssetIds`, "specificAssetIds muss ein Array sein."));
+  }
+}
+
+function validateReferenceIfPresent(reference, path, issues, options = {}) {
+  if (reference === undefined || reference === null || reference === "") return;
+  validateReference(reference, path, issues, options);
+}
+
+function validateRequiredReference(reference, path, issues, options = {}) {
+  if (!reference) {
+    issues.push(errorIssue(path, "Reference fehlt."));
+    return;
+  }
+  validateReference(reference, path, issues, options);
+}
+
+function validateReference(reference, path, issues, options = {}) {
+  if (!isPlainObject(reference)) {
+    issues.push(errorIssue(path, "Reference muss ein Objekt sein."));
+    return;
+  }
+
+  if (!reference.type) {
+    issues.push(errorIssue(path, "Reference.type fehlt."));
+  } else if (!aasReferenceTypes.has(reference.type)) {
+    issues.push(errorIssue(`${path}.type`, `Reference.type "${reference.type}" ist nicht gueltig.`));
+  } else if (options.expectedReferenceType && reference.type !== options.expectedReferenceType) {
+    issues.push(
+      warnIssue(path, `AAS 3.x erwartet Reference.type "${options.expectedReferenceType}" fuer diese Referenz.`),
+    );
+  }
+
+  if (!Array.isArray(reference.keys) || reference.keys.length === 0) {
+    issues.push(errorIssue(path, "Reference.keys muss ein nicht-leeres Array sein."));
+    return;
+  }
+
+  reference.keys.forEach((key, keyIndex) => {
+    const keyPath = `${path}.keys[${keyIndex}]`;
+    if (!isPlainObject(key)) {
+      issues.push(errorIssue(keyPath, "Key muss ein Objekt sein."));
+      return;
+    }
+    if (!key.type) {
+      issues.push(errorIssue(keyPath, "Key.type fehlt."));
+    } else if (!aasKeyTypes.has(key.type)) {
+      issues.push(errorIssue(`${keyPath}.type`, `Key.type "${key.type}" ist nicht gueltig.`));
+    }
+    if (!key.value) {
+      issues.push(errorIssue(keyPath, "Key.value fehlt."));
+    }
+  });
+
+  const lastKeyType = reference.keys.at(-1)?.type;
+  if (options.expectedKeyType && lastKeyType && lastKeyType !== options.expectedKeyType) {
+    issues.push(errorIssue(path, `Letzter Key muss Typ "${options.expectedKeyType}" haben, ist aber "${lastKeyType}".`));
+  }
+}
+
+function validateQualifiers(qualifiers, path, issues) {
+  if (qualifiers === undefined) return;
+  if (!Array.isArray(qualifiers)) {
+    issues.push(errorIssue(path, "qualifiers muss ein Array sein."));
+    return;
+  }
+
+  qualifiers.forEach((qualifier, qualifierIndex) => {
+    const qualifierPath = `${path}[${qualifierIndex}]`;
+    if (!isPlainObject(qualifier)) {
+      issues.push(errorIssue(qualifierPath, "Qualifier muss ein Objekt sein."));
+      return;
+    }
+    requireField(qualifier, "type", qualifierPath, issues);
+    if (qualifier.valueType) {
+      validateValueType(qualifier.valueType, `${qualifierPath}.valueType`, issues);
+      validatePropertyValueByType(qualifier.value, qualifier.valueType, `${qualifierPath}.value`, issues);
+    }
+  });
+}
+
+function validateIdShort(value, path, issues) {
+  if (value === undefined || value === null || value === "") return;
+  if (!isValidIdShort(value)) {
+    issues.push(errorIssue(path, `idShort "${value}" ist nicht AAS-3.x-kompatibel.`));
+  }
+}
+
+function validateValueType(valueType, path, issues) {
+  if (!aasValueTypes.has(valueType)) {
+    issues.push(errorIssue(path, `valueType "${valueType}" ist kein gueltiger AAS-3.x-DataTypeDefXsd.`));
+  }
+}
+
+function validatePropertyValueByType(value, valueType, path, issues) {
+  if (value === undefined || value === null || value === "") return;
+  const raw = String(value);
+
+  if (valueType === "xs:boolean" && !["true", "false", "0", "1"].includes(raw.toLowerCase())) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:boolean.`));
+  }
+
+  const integerTypes = new Set([
+    "xs:byte",
+    "xs:int",
+    "xs:integer",
+    "xs:long",
+    "xs:negativeInteger",
+    "xs:nonNegativeInteger",
+    "xs:nonPositiveInteger",
+    "xs:positiveInteger",
+    "xs:short",
+    "xs:unsignedByte",
+    "xs:unsignedInt",
+    "xs:unsignedLong",
+    "xs:unsignedShort",
+  ]);
+
+  if (integerTypes.has(valueType) && !/^-?\d+$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu ${valueType}.`));
+  }
+
+  if (
+    ["xs:decimal", "xs:double", "xs:float"].includes(valueType) &&
+    !Number.isFinite(Number(raw))
+  ) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu ${valueType}.`));
+  }
+
+  if (valueType === "xs:positiveInteger" && /^-?\d+$/.test(raw) && Number(raw) <= 0) {
+    issues.push(errorIssue(path, `Wert "${raw}" muss groesser als 0 sein.`));
+  }
+
+  if (["xs:nonNegativeInteger", "xs:unsignedByte", "xs:unsignedInt", "xs:unsignedLong", "xs:unsignedShort"].includes(valueType) && /^-?\d+$/.test(raw) && Number(raw) < 0) {
+    issues.push(errorIssue(path, `Wert "${raw}" darf nicht negativ sein.`));
+  }
+
+  if (valueType === "xs:negativeInteger" && /^-?\d+$/.test(raw) && Number(raw) >= 0) {
+    issues.push(errorIssue(path, `Wert "${raw}" muss negativ sein.`));
+  }
+
+  if (valueType === "xs:nonPositiveInteger" && /^-?\d+$/.test(raw) && Number(raw) > 0) {
+    issues.push(errorIssue(path, `Wert "${raw}" darf nicht positiv sein.`));
+  }
+
+  if (valueType === "xs:date" && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:date.`));
+  }
+
+  if (valueType === "xs:dateTime" && Number.isNaN(Date.parse(raw))) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:dateTime.`));
+  }
+
+  if (valueType === "xs:time" && !/^\d{2}:\d{2}:\d{2}/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:time.`));
+  }
+
+  if (valueType === "xs:duration" && !/^-?P/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:duration.`));
+  }
+
+  if (valueType === "xs:anyURI" && /\s/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" enthaelt Leerzeichen und passt nicht zu xs:anyURI.`));
+  }
+}
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function renderValidation(report) {
@@ -1041,15 +2060,15 @@ function renderValidation(report) {
     statusLabel.textContent = `${warningCount} Warnungen`;
   } else {
     statusLabel.classList.add("valid");
-    statusLabel.textContent = "Valide Basisstruktur";
+    statusLabel.textContent = "Valide AAS 3.x";
   }
 
   summaryText.textContent =
     errorCount > 0
-      ? "Die Datei braucht Korrekturen, bevor sie als robuste AAS weiterverarbeitet werden sollte."
+      ? "Die Datei verletzt AAS-3.x-Regeln und braucht Korrekturen vor der Weiterverarbeitung."
       : warningCount > 0
-        ? "Die Struktur ist nutzbar, aber einige semantische Angaben sollten ergaenzt werden."
-        : "Die wichtigsten Pflichtfelder und Referenzen sind konsistent.";
+        ? "Die Struktur ist AAS-3.x-lesbar, aber einige semantische Angaben sollten ergaenzt werden."
+        : "Die wichtigsten AAS-3.x-Pflichtfelder, Typen und Referenzen sind konsistent.";
 
   stats.innerHTML = `
     <div><strong>${report.stats.shells}</strong><span>AAS</span></div>
@@ -1068,102 +2087,324 @@ function renderValidation(report) {
           `,
         )
         .join("")
-    : `<div class="issue"><strong>Keine Issues gefunden</strong><span>Basispruefung erfolgreich.</span></div>`;
+    : `<div class="issue"><strong>Keine Issues gefunden</strong><span>AAS-3.x-Metamodel-Pruefung erfolgreich.</span></div>`;
 }
 
 function renderExplorer(aasPackage, query = "") {
+  if (!aasPackage) return;
+
   const normalizedQuery = query.trim().toLowerCase();
-  const submodels = aasPackage.submodels ?? [];
-  const submodelById = new Map(submodels.map((submodel) => [submodel.id, submodel]));
-  const shells = aasPackage.assetAdministrationShells ?? [];
+  updateTreeControls(Boolean(normalizedQuery));
+  const rootNode = buildExplorerTree(aasPackage);
+  const visibleTree = filterTreeNode(rootNode, normalizedQuery);
+  const visibleNodes = new Map();
+  if (visibleTree) collectExplorerNodes(visibleTree, visibleNodes);
+  explorerNodes = visibleNodes;
 
-  const html = shells
-    .map((shell) => {
-      const referencedSubmodels = (shell.submodels ?? [])
-        .map((reference) => submodelById.get(reference.keys?.at(-1)?.value))
-        .filter(Boolean);
+  const shouldPreferSearchHit =
+    normalizedQuery && normalizedQuery !== lastExplorerQuery && selectedExplorerNodeId === "package";
 
-      const matchingSubmodels = referencedSubmodels
-        .map((submodel) => filterSubmodel(submodel, normalizedQuery))
-        .filter(Boolean);
+  if (!explorerNodes.has(selectedExplorerNodeId) || shouldPreferSearchHit) {
+    selectedExplorerNodeId = findPreferredVisibleNode(visibleTree, normalizedQuery)?.id ?? "package";
+  }
+  lastExplorerQuery = normalizedQuery;
 
-      const shellMatches = matchesQuery(shell, normalizedQuery);
-      if (normalizedQuery && !shellMatches && matchingSubmodels.length === 0) return "";
-
-      return `
-        <article class="aas-card">
-          <div class="aas-header">
-            <h3>${escapeHtml(shell.idShort ?? "AAS ohne idShort")}</h3>
-            <div class="meta">${escapeHtml(shell.id ?? "")}</div>
-            <div class="meta">Asset: ${escapeHtml(shell.assetInformation?.globalAssetId ?? "nicht gesetzt")}</div>
-          </div>
-          ${matchingSubmodels.map(renderSubmodel).join("") || `<div class="submodel">Keine passenden Submodels.</div>`}
-        </article>
-      `;
-    })
-    .join("");
-
-  explorer.className = html ? "" : "explorer-empty";
-  explorer.innerHTML = html || "Keine passenden Eintraege gefunden.";
-}
-
-function renderSubmodel(submodel) {
-  return `
-    <section class="submodel">
-      <h4>${escapeHtml(submodel.idShort ?? "Submodel ohne idShort")}</h4>
-      <div class="meta">${escapeHtml(submodel.id ?? "")}</div>
-      <div class="element-grid">
-        ${(submodel.submodelElements ?? []).map(renderElement).join("") || "<p>Keine Elemente.</p>"}
-      </div>
-    </section>
-  `;
-}
-
-function renderElement(element) {
-  const semantic = element.semanticId?.keys?.at(-1)?.value ?? "keine semanticId";
-  const unit = element.qualifiers?.find((qualifier) => qualifier.type === "unit")?.value;
-  if (element.modelType === "SubmodelElementCollection") {
-    return `
-      <div class="element-row collection-row">
-        <code>${escapeHtml(element.idShort ?? "")}</code>
-        <span>Collection</span>
-        <span class="value-cell">${escapeHtml((element.value ?? []).map((item) => `${item.idShort}: ${formatValue(item.value)}`).join("; "))}</span>
-        <span class="semantic-cell">${escapeHtml(semantic)}</span>
-      </div>
-    `;
+  if (!visibleTree) {
+    explorer.className = "explorer-empty";
+    explorer.innerHTML = "Keine passenden Eintraege gefunden.";
+    renderJsonInspector();
+    return;
   }
 
+  explorer.className = "explorer-tree";
+  explorer.innerHTML = `
+    <ul class="tree-list">
+      ${renderTreeNode(visibleTree, 0, Boolean(normalizedQuery))}
+    </ul>
+  `;
+  renderJsonInspector();
+}
+
+function buildExplorerTree(aasPackage) {
+  const shells = aasPackage.assetAdministrationShells ?? [];
+  const submodels = aasPackage.submodels ?? [];
+  const conceptDescriptions = aasPackage.conceptDescriptions ?? [];
+  const submodelById = new Map(submodels.map((submodel, index) => [submodel.id, { submodel, index }]));
+  const referencedSubmodelIds = new Set(
+    shells.flatMap((shell) => (shell.submodels ?? []).map((reference) => reference.keys?.at(-1)?.value).filter(Boolean)),
+  );
+
+  const shellNodes = shells.map((shell, shellIndex) => buildShellNode(shell, shellIndex, submodelById));
+  const unreferencedSubmodels = submodels
+    .map((submodel, index) => ({ submodel, index }))
+    .filter(({ submodel }) => !referencedSubmodelIds.has(submodel.id));
+  const groupNodes = [];
+
+  if (unreferencedSubmodels.length > 0) {
+    groupNodes.push(
+      createExplorerNode({
+        id: "unreferenced-submodels",
+        kind: "Gruppe",
+        label: "Nicht referenzierte Submodels",
+        meta: `${unreferencedSubmodels.length} Submodels`,
+        value: unreferencedSubmodels.map(({ submodel }) => submodel),
+        children: unreferencedSubmodels.map(({ submodel, index }) => buildSubmodelNode(submodel, index)),
+      }),
+    );
+  }
+
+  if (conceptDescriptions.length > 0) {
+    groupNodes.push(
+      createExplorerNode({
+        id: "concept-descriptions",
+        kind: "Gruppe",
+        label: "Concept Descriptions",
+        meta: `${conceptDescriptions.length} Eintraege`,
+        value: conceptDescriptions,
+        children: conceptDescriptions.map(buildConceptDescriptionNode),
+      }),
+    );
+  }
+
+  return createExplorerNode({
+    id: "package",
+    kind: "Package",
+    label: "AAS Package",
+    meta: `${shells.length} AAS | ${submodels.length} Submodels | ${countSubmodelElements(submodels)} Elements`,
+    value: aasPackage,
+    children: [...shellNodes, ...groupNodes],
+  });
+}
+
+function buildShellNode(shell, shellIndex, submodelById) {
+  return createExplorerNode({
+    id: `shell:${shellIndex}`,
+    kind: "AAS",
+    label: shell.idShort ?? `AAS ${shellIndex + 1}`,
+    meta: shell.assetInformation?.globalAssetId ?? shell.id ?? "",
+    value: shell,
+    children: buildReferencedSubmodelNodes(shell, shellIndex, submodelById),
+  });
+}
+
+function buildReferencedSubmodelNodes(shell, shellIndex, submodelById) {
+  return (shell.submodels ?? []).map((reference, referenceIndex) => {
+    const target = reference.keys?.at(-1)?.value;
+    const match = submodelById.get(target);
+    if (match) return buildSubmodelNode(match.submodel, match.index);
+
+    return createExplorerNode({
+      id: `shell:${shellIndex}:missing-submodel:${referenceIndex}`,
+      kind: "Referenz",
+      label: target || `Submodel-Referenz ${referenceIndex + 1}`,
+      meta: "Nicht gefunden",
+      value: reference,
+      children: [],
+    });
+  });
+}
+
+function buildSubmodelNode(submodel, submodelIndex) {
+  const elements = submodel.submodelElements ?? [];
+  return createExplorerNode({
+    id: `submodel:${submodelIndex}`,
+    kind: "Submodel",
+    label: submodel.idShort ?? `Submodel ${submodelIndex + 1}`,
+    meta: `${elements.length} Elements | ${submodel.id ?? ""}`,
+    value: submodel,
+    children: elements.map((element, elementIndex) => buildElementNode(element, submodelIndex, [elementIndex])),
+  });
+}
+
+function buildElementNode(element, submodelIndex, elementPath) {
+  const children = getElementChildren(element);
+  const unit = element.qualifiers?.find((qualifier) => qualifier.type === "unit")?.value;
+  const valueLabel = children.length
+    ? `${children.length} Children`
+    : [element.valueType, formatValue(element.value), unit].filter(Boolean).join(" ");
+
+  return createExplorerNode({
+    id: `submodel:${submodelIndex}:element:${elementPath.join("-")}`,
+    kind: element.modelType ?? "Element",
+    label: element.idShort ?? `Element ${elementPath.at(-1) + 1}`,
+    meta: valueLabel,
+    value: element,
+    children: children.map((child, childIndex) => buildElementNode(child, submodelIndex, [...elementPath, childIndex])),
+  });
+}
+
+function getElementChildren(element) {
+  switch (element?.modelType) {
+    case "SubmodelElementCollection":
+    case "SubmodelElementList":
+      return Array.isArray(element.value) ? element.value.filter(isPlainObject) : [];
+    case "Entity":
+      return Array.isArray(element.statements) ? element.statements.filter(isPlainObject) : [];
+    case "AnnotatedRelationshipElement":
+      return Array.isArray(element.annotations) ? element.annotations.filter(isPlainObject) : [];
+    case "Operation":
+      return [
+        ...(element.inputVariables ?? []),
+        ...(element.outputVariables ?? []),
+        ...(element.inoutputVariables ?? []),
+      ]
+        .map((variable) => variable?.value)
+        .filter(isPlainObject);
+    default:
+      return [];
+  }
+}
+
+function buildConceptDescriptionNode(conceptDescription, index) {
+  return createExplorerNode({
+    id: `concept:${index}`,
+    kind: "Concept",
+    label: conceptDescription.idShort ?? conceptDescription.id ?? `Concept ${index + 1}`,
+    meta: conceptDescription.id ?? "",
+    value: conceptDescription,
+    children: [],
+  });
+}
+
+function createExplorerNode({ id, kind, label, meta, value, children = [] }) {
+  return {
+    id,
+    kind,
+    label,
+    meta,
+    value,
+    children,
+  };
+}
+
+function filterTreeNode(node, normalizedQuery) {
+  if (!normalizedQuery || nodeMatchesQuery(node, normalizedQuery)) return node;
+
+  const children = node.children
+    .map((child) => filterTreeNode(child, normalizedQuery))
+    .filter(Boolean);
+
+  if (children.length === 0) return null;
+  return { ...node, children };
+}
+
+function nodeMatchesQuery(node, normalizedQuery) {
+  const haystack = [
+    node.kind,
+    node.label,
+    node.meta,
+    JSON.stringify(getSearchableValue(node.value)),
+  ].join(" ");
+  return haystack.toLowerCase().includes(normalizedQuery);
+}
+
+function getSearchableValue(value) {
+  if (!value || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    return value.every((item) => item && typeof item === "object") ? [] : value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key, entry]) => !isNestedModelArray(key, entry))
+      .map(([key, entry]) => [key, getSearchableValue(entry)]),
+  );
+}
+
+function isNestedModelArray(key, value) {
+  return nestedModelSearchKeys.has(key) && Array.isArray(value) && value.every((item) => item && typeof item === "object");
+}
+
+function collectExplorerNodes(node, nodes) {
+  nodes.set(node.id, node);
+  node.children.forEach((child) => collectExplorerNodes(child, nodes));
+}
+
+function findPreferredVisibleNode(node, normalizedQuery) {
+  if (!node) return null;
+  if (normalizedQuery && node.id !== "package" && nodeMatchesQuery(node, normalizedQuery)) return node;
+
+  for (const child of node.children) {
+    const match = findPreferredVisibleNode(child, normalizedQuery);
+    if (match) return match;
+  }
+
+  return node;
+}
+
+function renderTreeNode(node, depth, forceExpanded) {
+  const hasChildren = node.children.length > 0;
+  const isExpanded = hasChildren && (forceExpanded || expandedExplorerNodeIds.has(node.id));
+  const isSelected = node.id === selectedExplorerNodeId;
+
   return `
-    <div class="element-row">
-      <code>${escapeHtml(element.idShort ?? "")}</code>
-      <span>${escapeHtml(element.valueType ?? element.modelType ?? "")}</span>
-      <span class="value-cell">${escapeHtml(formatValue(element.value))}${unit ? ` ${escapeHtml(unit)}` : ""}</span>
-      <span class="semantic-cell">${escapeHtml(semantic)}</span>
-    </div>
+    <li>
+      <div class="tree-node${isSelected ? " selected" : ""}" style="--tree-depth: ${depth}">
+        <button
+          class="tree-toggle"
+          type="button"
+          data-tree-toggle="${escapeHtml(node.id)}"
+          aria-label="${isExpanded ? "Knoten schliessen" : "Knoten oeffnen"}"
+          aria-expanded="${isExpanded}"
+          ${hasChildren ? "" : "disabled"}
+        >${hasChildren ? (isExpanded ? "-" : "+") : ""}</button>
+        <button class="tree-select" type="button" data-node-id="${escapeHtml(node.id)}">
+          <span class="tree-kind">${escapeHtml(node.kind)}</span>
+          <span class="tree-label">${escapeHtml(node.label)}</span>
+          ${node.meta ? `<span class="tree-meta">${escapeHtml(node.meta)}</span>` : ""}
+        </button>
+      </div>
+      ${
+        isExpanded
+          ? `<ul class="tree-list">${node.children.map((child) => renderTreeNode(child, depth + 1, forceExpanded)).join("")}</ul>`
+          : ""
+      }
+    </li>
   `;
 }
 
-function filterSubmodel(submodel, normalizedQuery) {
-  if (!normalizedQuery) return submodel;
-  if (matchesQuery(submodel, normalizedQuery)) return submodel;
+function renderJsonInspector() {
+  const node = explorerNodes.get(selectedExplorerNodeId);
+  if (!node) {
+    jsonInspectorTitle.textContent = "Keine Auswahl";
+    jsonInspectorMeta.textContent = "Keine passenden Daten im aktuellen Filter.";
+    jsonInspectorContent.textContent = "Keine Daten geladen.";
+    copyJsonButton.disabled = true;
+    return;
+  }
 
-  const matchingElements = (submodel.submodelElements ?? []).filter((element) =>
-    matchesQuery(element, normalizedQuery),
-  );
-
-  if (matchingElements.length === 0) return null;
-  return { ...submodel, submodelElements: matchingElements };
+  const childLabel = node.children.length === 1 ? "1 Unterknoten" : `${node.children.length} Unterknoten`;
+  jsonInspectorTitle.textContent = node.label;
+  jsonInspectorMeta.textContent = [node.kind, node.meta, childLabel].filter(Boolean).join(" | ");
+  jsonInspectorContent.textContent = JSON.stringify(node.value, null, 2);
+  copyJsonButton.disabled = false;
 }
 
-function matchesQuery(entity, normalizedQuery) {
-  if (!normalizedQuery) return true;
-  return JSON.stringify(entity).toLowerCase().includes(normalizedQuery);
+function updateTreeControls(hasActiveSearch) {
+  const disabled = !currentPackage || hasActiveSearch;
+  expandTreeButton.disabled = disabled;
+  collapseTreeButton.disabled = disabled;
+}
+
+function countSubmodelElements(submodels) {
+  return submodels.reduce((count, submodel) => {
+    return count + countElements(submodel.submodelElements ?? []);
+  }, 0);
+}
+
+function countElements(elements) {
+  return elements.reduce((count, element) => {
+    return count + 1 + countElements(getElementChildren(element));
+  }, 0);
 }
 
 function renderError(error) {
   currentPackage = null;
+  currentValidationReport = null;
   downloadButton.disabled = true;
   downloadAasxButton.disabled = true;
+  downloadPdfButton.disabled = true;
+  downloadExcelButton.disabled = true;
   saveRepositoryButton.disabled = true;
   statusLabel.className = "status-pill invalid";
   statusLabel.textContent = "Importfehler";
@@ -1174,8 +2415,11 @@ function renderError(error) {
     <div><strong>0</strong><span>Elements</span></div>
   `;
   issuesList.innerHTML = "";
+  resetExplorerState();
+  updateTreeControls(false);
   explorer.className = "explorer-empty";
   explorer.textContent = "Die Datei konnte nicht geladen werden.";
+  renderJsonInspector();
 }
 
 function downloadBlob(blob, fileName) {
@@ -1203,7 +2447,7 @@ function warnIssue(title, message) {
 
 function referenceTo(type, value) {
   return {
-    type: "ExternalReference",
+    type: type === "Submodel" ? "ModelReference" : "ExternalReference",
     keys: [{ type, value }],
   };
 }
@@ -1235,7 +2479,7 @@ function normalizeValueType(valueType) {
 }
 
 function isValidIdShort(value) {
-  return typeof value === "string" && /^[A-Za-z][A-Za-z0-9_]*$/.test(value);
+  return typeof value === "string" && /^[A-Za-z][A-Za-z0-9_-]*$/.test(value);
 }
 
 function formatValue(value) {
