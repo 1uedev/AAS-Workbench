@@ -2,6 +2,7 @@ import { createAasxBlob } from "./aasx-export.js";
 import { readAasxPackage } from "./aasx-import.js";
 import { createAasPdfBlob } from "./pdf-export.js";
 import { createAasExcelBlob } from "./xlsx-export.js";
+import { createValidationReportBlob } from "./validation-report-export.js";
 
 const fileInput = document.querySelector("#fileInput");
 const dropZone = document.querySelector(".drop-zone");
@@ -10,6 +11,7 @@ const downloadButton = document.querySelector("#downloadButton");
 const downloadAasxButton = document.querySelector("#downloadAasxButton");
 const downloadPdfButton = document.querySelector("#downloadPdfButton");
 const downloadExcelButton = document.querySelector("#downloadExcelButton");
+const downloadValidationReportButton = document.querySelector("#downloadValidationReportButton");
 const statusLabel = document.querySelector("#statusLabel");
 const summaryText = document.querySelector("#summaryText");
 const stats = document.querySelector("#stats");
@@ -308,6 +310,17 @@ downloadExcelButton.addEventListener("click", () => {
       generatedAt: new Date(),
     }),
     `${currentFileName}-export.xlsx`,
+  );
+});
+
+downloadValidationReportButton.addEventListener("click", () => {
+  if (!currentPackage || !currentValidationReport) return;
+  downloadBlob(
+    createValidationReportBlob(currentPackage, currentValidationReport, {
+      fileName: currentFileName,
+      generatedAt: new Date(),
+    }),
+    `${currentFileName}-validation-report.json`,
   );
 });
 
@@ -624,6 +637,7 @@ function loadPackage(aasPackage) {
   downloadAasxButton.disabled = false;
   downloadPdfButton.disabled = false;
   downloadExcelButton.disabled = false;
+  downloadValidationReportButton.disabled = false;
   saveRepositoryButton.disabled = false;
 }
 
@@ -2465,6 +2479,7 @@ function renderError(error) {
   downloadAasxButton.disabled = true;
   downloadPdfButton.disabled = true;
   downloadExcelButton.disabled = true;
+  downloadValidationReportButton.disabled = true;
   saveRepositoryButton.disabled = true;
   statusLabel.className = "status-pill invalid";
   statusLabel.textContent = "Importfehler";

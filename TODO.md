@@ -4,11 +4,10 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add machine-readable validation report export.
+- [ ] Check semantic IDs more deeply.
 
 ## Validator Enhancements
 
-- [ ] Check semantic IDs more deeply.
 - [ ] Check references more deeply.
 - [ ] Check data types more deeply.
 - [ ] Check units more deeply.

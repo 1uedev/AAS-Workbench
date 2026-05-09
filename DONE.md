@@ -47,6 +47,14 @@
 - Added JSON export.
 - Added PDF report export for the currently loaded AAS package.
 - Added Excel workbook export with Summary, AAS, Submodels, Elements and Issues sheets.
+- Added machine-readable validation report JSON export with:
+  - Schema identifier
+  - Generated timestamp and source file
+  - Validation status
+  - Package stats
+  - Issue counts and category counts
+  - AAS/Submodel summary
+  - Complete issue list
 - Added real `.aasx` export as OPC/ZIP package with:
   - `[Content_Types].xml`
   - `_rels/.rels`
@@ -100,12 +108,14 @@
   - Repository version compare flow on desktop and mobile
   - AAS 3.x validation status after sample loading
   - Validation category UI smoke test without console errors
+  - Validation report JSON export button enables after sample loading
 - Browser check for enabled PDF export after sample loading
 - Node-generated PDF report rendered with Quick Look for visual inspection
 - Node-generated PDF report with validation category labels
 - Browser check for enabled Excel export after sample loading
 - Node-generated Excel workbook passed `unzip -t` and rendered with Quick Look
 - Node-generated Excel workbook with validation severity/category columns passed `unzip -t`
+- Node-generated machine-readable validation report JSON parsed successfully
 - Local `.aasx` package generated and inspected with `unzip -l`.
 - AASX export/import roundtrip tested in Node with matching AAS structure.
 - Realistic sample JSON files parsed successfully.

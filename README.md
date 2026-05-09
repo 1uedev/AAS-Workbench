@@ -14,7 +14,7 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 - AAS, Submodels und Submodel Elements per Tree navigieren und durchsuchen
 - Ausgewaehlte Explorer-Knoten im Side-by-side JSON Inspector pruefen
 - Zwei Repository-Versionen eines AAS vergleichen und Aenderungen nach hinzugefuegt, entfernt und geaendert sehen
-- Ergebnis als JSON, `.aasx`, PDF-Report oder Excel-Arbeitsmappe exportieren
+- Ergebnis als JSON, `.aasx`, PDF-Report, Excel-Arbeitsmappe oder Validierungsreport exportieren
 
 ## AASX-Export
 
@@ -39,6 +39,10 @@ Der PDF-Export erzeugt einen kompakten Report zur aktuell geladenen AAS-Umgebung
 ## Excel-Export
 
 Der Excel-Export erzeugt eine `.xlsx`-Arbeitsmappe mit getrennten Sheets fuer Summary, AAS, Submodels, Elements und Issues inklusive Severity und Kategorie. Damit lassen sich AAS-Daten direkt filtern, auswerten und in andere Werkzeuge uebernehmen.
+
+## Validierungsreport-Export
+
+Der Validierungsreport-Export erzeugt eine maschinenlesbare JSON-Datei mit Schema-Kennung, Erstellzeitpunkt, Status, Kennzahlen, Issue-Counts, Kategorie-Counts, AAS-/Submodel-Zusammenfassung und vollstaendiger Issue-Liste.
 
 ## Validierung
 
@@ -119,6 +123,6 @@ Jedes Beispiel ist als `.json` und als importierbares `.aasx` vorhanden.
 ## Nächste sinnvolle Ausbaustufen
 
 - Live-Gateway-Backend fuer OPC UA und MQTT
-- Validierungsreport mit Kategorien und maschinenlesbarem Export
+- Tiefere `semanticId`- und Referenzpruefungen
 - Submodel-Template-Katalog
 - Backend-API mit Repository und Versionierung
