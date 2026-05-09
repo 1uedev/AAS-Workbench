@@ -23,7 +23,10 @@ function buildReport(builder, aasPackage, options) {
 
   builder.heading("Uebersicht", 15);
   builder.text(`AAS: ${stats.shells} | Submodels: ${stats.submodels} | Elements: ${stats.elements}`);
-  builder.text(`Validierung: ${issueCounts.errors} Fehler | ${issueCounts.warnings} Warnungen`, { gapAfter: 8 });
+  builder.text(
+    `Validierung: ${issueCounts.errors} Fehler | ${issueCounts.warnings} Warnungen${issueCounts.infos ? ` | ${issueCounts.infos} Infos` : ""}`,
+    { gapAfter: 8 },
+  );
 
   renderIssues(builder, validation.issues ?? []);
   renderShells(builder, aasPackage);
@@ -38,10 +41,13 @@ function renderIssues(builder, issues) {
   }
 
   issues.slice(0, 20).forEach((issue) => {
-    builder.text(`${issue.level === "error" ? "Fehler" : "Warnung"}: ${issue.title} - ${issue.message}`, {
-      bullet: true,
-      size: 9,
-    });
+    builder.text(
+      `${formatIssueLevel(issue.level)} | ${formatIssueCategory(issue.category)}: ${issue.title} - ${issue.message}`,
+      {
+        bullet: true,
+        size: 9,
+      },
+    );
   });
 
   if (issues.length > 20) {
@@ -181,7 +187,28 @@ function countIssues(issues) {
   return {
     errors: issues.filter((issue) => issue.level === "error").length,
     warnings: issues.filter((issue) => issue.level === "warning").length,
+    infos: issues.filter((issue) => issue.level === "info").length,
   };
+}
+
+function formatIssueLevel(level) {
+  const labels = {
+    error: "Fehler",
+    warning: "Warnung",
+    info: "Info",
+  };
+  return labels[level] ?? level ?? "Issue";
+}
+
+function formatIssueCategory(category) {
+  const labels = {
+    structure: "Struktur",
+    references: "Referenzen",
+    datatypes: "Datentypen",
+    semantics: "Semantik",
+    interoperability: "Interoperabilitaet",
+  };
+  return labels[category] ?? labels.structure;
 }
 
 function formatValue(value) {

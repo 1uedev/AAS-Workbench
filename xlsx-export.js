@@ -43,6 +43,7 @@ function buildWorkbookSheets(aasPackage, options) {
         ["Elements", stats.elements],
         ["Validation Errors", issueCounts.errors],
         ["Validation Warnings", issueCounts.warnings],
+        ["Validation Info", issueCounts.infos],
       ],
     },
     {
@@ -91,10 +92,15 @@ function buildWorkbookSheets(aasPackage, options) {
     },
     {
       name: "Issues",
-      widths: [16, 44, 80],
+      widths: [16, 22, 44, 80],
       rows: [
-        ["level", "path", "message"],
-        ...(validation.issues ?? []).map((issue) => [issue.level, issue.title, issue.message]),
+        ["severity", "category", "path", "message"],
+        ...(validation.issues ?? []).map((issue) => [
+          issue.severity ?? issue.level,
+          issue.category ?? "structure",
+          issue.title,
+          issue.message,
+        ]),
       ],
     },
   ];
@@ -330,6 +336,7 @@ function countIssues(issues) {
   return {
     errors: issues.filter((issue) => issue.level === "error").length,
     warnings: issues.filter((issue) => issue.level === "warning").length,
+    infos: issues.filter((issue) => issue.level === "info").length,
   };
 }
 

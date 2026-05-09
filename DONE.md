@@ -37,6 +37,11 @@
   - AAS 3.x `idShort` format including hyphen support
   - `DataTypeDefXsd` checks for Property, Range and Qualifier values
   - Recursive checks for nested Collections, Lists, Entities, Operations, Events and Relationships
+- Added validation severity and category reporting:
+  - Issue severity and category fields
+  - Category badges in the validation UI
+  - Severity/category columns in Excel export
+  - Severity/category labels in PDF export
 - Added explorer view for AAS, Submodels and Properties.
 - Added search over loaded AAS structure.
 - Added JSON export.
@@ -94,10 +99,13 @@
   - Explorer desktop and mobile responsive layout without console errors
   - Repository version compare flow on desktop and mobile
   - AAS 3.x validation status after sample loading
+  - Validation category UI smoke test without console errors
 - Browser check for enabled PDF export after sample loading
 - Node-generated PDF report rendered with Quick Look for visual inspection
+- Node-generated PDF report with validation category labels
 - Browser check for enabled Excel export after sample loading
 - Node-generated Excel workbook passed `unzip -t` and rendered with Quick Look
+- Node-generated Excel workbook with validation severity/category columns passed `unzip -t`
 - Local `.aasx` package generated and inspected with `unzip -l`.
 - AASX export/import roundtrip tested in Node with matching AAS structure.
 - Realistic sample JSON files parsed successfully.

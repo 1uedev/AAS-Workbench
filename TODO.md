@@ -4,15 +4,14 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add severity levels and validation categories.
+- [ ] Add machine-readable validation report export.
 
 ## Validator Enhancements
 
 - [ ] Check semantic IDs more deeply.
-- [ ] Check data types more deeply.
 - [ ] Check references more deeply.
+- [ ] Check data types more deeply.
 - [ ] Check units more deeply.
-- [ ] Add machine-readable validation report export.
 
 ## Generator Enhancements
 

@@ -775,6 +775,13 @@ body[data-route="repository"] [data-panel="status"] {
   margin-top: 18px;
 }
 
+.issue-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .issue {
   border-left: 4px solid var(--warning);
   background: #fffbeb;
@@ -785,6 +792,74 @@ body[data-route="repository"] [data-panel="status"] {
 .issue.error {
   border-left-color: var(--danger);
   background: #fff1f0;
+}
+
+.issue.info {
+  border-left-color: #2f80ed;
+  background: #eff6ff;
+}
+
+.issue-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.issue-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: #f3f4f6;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.issue-badge.error,
+.issue-badge.severity-error {
+  background: #fee4e2;
+  color: var(--danger);
+}
+
+.issue-badge.warning,
+.issue-badge.severity-warning {
+  background: #fef0c7;
+  color: var(--warning);
+}
+
+.issue-badge.info,
+.issue-badge.severity-info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.issue-badge.category-structure {
+  background: #eceff3;
+  color: #344054;
+}
+
+.issue-badge.category-references {
+  background: #e0f2fe;
+  color: #026aa2;
+}
+
+.issue-badge.category-datatypes {
+  background: #e7f8ee;
+  color: #067647;
+}
+
+.issue-badge.category-semantics {
+  background: #f4ebff;
+  color: #6941c6;
+}
+
+.issue-badge.category-interoperability {
+  background: #fff1e6;
+  color: #b54708;
 }
 
 .issue strong {

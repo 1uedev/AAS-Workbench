@@ -178,6 +178,22 @@ const entityTypes = new Set(["CoManagedEntity", "SelfManagedEntity"]);
 const eventDirections = new Set(["input", "output"]);
 const eventStates = new Set(["on", "off"]);
 
+const issueSeverityLabels = {
+  error: "Fehler",
+  warning: "Warnung",
+  info: "Info",
+};
+
+const issueCategoryLabels = {
+  structure: "Struktur",
+  references: "Referenzen",
+  datatypes: "Datentypen",
+  semantics: "Semantik",
+  interoperability: "Interoperabilitaet",
+};
+
+const issueCategoryOrder = ["structure", "references", "datatypes", "semantics", "interoperability"];
+
 const sampleCsv = `assetId,assetName,submodelId,submodelName,idShort,valueType,value,semanticId,unit
 urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:TechnicalData,Technical Data,Manufacturer,string,ACME Industrial,https://admin-shell.io/idta/Manufacturer,
 urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:TechnicalData,Technical Data,NominalPower,double,7.5,https://admin-shell.io/idta/NominalPower,kW
@@ -2050,6 +2066,7 @@ function isPlainObject(value) {
 function renderValidation(report) {
   const errorCount = report.issues.filter((issue) => issue.level === "error").length;
   const warningCount = report.issues.filter((issue) => issue.level === "warning").length;
+  const infoCount = report.issues.filter((issue) => issue.level === "info").length;
 
   statusLabel.className = "status-pill";
   if (errorCount > 0) {
@@ -2077,17 +2094,60 @@ function renderValidation(report) {
   `;
 
   issuesList.innerHTML = report.issues.length
-    ? report.issues
-        .map(
-          (issue) => `
-            <div class="issue ${issue.level === "error" ? "error" : ""}">
-              <strong>${escapeHtml(issue.title)}</strong>
-              <span>${escapeHtml(issue.message)}</span>
-            </div>
-          `,
-        )
-        .join("")
+    ? `
+      <div class="issue-summary">
+        <span class="issue-badge severity-error">${errorCount} Fehler</span>
+        <span class="issue-badge severity-warning">${warningCount} Warnungen</span>
+        ${infoCount ? `<span class="issue-badge severity-info">${infoCount} Infos</span>` : ""}
+        ${renderIssueCategorySummary(report.issues)}
+      </div>
+      ${report.issues.map(renderIssueCard).join("")}
+    `
     : `<div class="issue"><strong>Keine Issues gefunden</strong><span>AAS-3.x-Metamodel-Pruefung erfolgreich.</span></div>`;
+}
+
+function renderIssueCategorySummary(issues) {
+  const categoryCounts = countIssuesByCategory(issues);
+  return issueCategoryOrder
+    .filter((category) => categoryCounts.get(category) > 0)
+    .map(
+      (category) =>
+        `<span class="issue-badge category-${category}">${getIssueCategoryLabel(category)} ${categoryCounts.get(category)}</span>`,
+    )
+    .join("");
+}
+
+function renderIssueCard(issue) {
+  return `
+    <div class="issue ${getIssueLevelClass(issue.level)}">
+      <div class="issue-meta">
+        <span class="issue-badge ${getIssueLevelClass(issue.level)}">${getIssueSeverityLabel(issue.level)}</span>
+        <span class="issue-badge category-${issue.category ?? "structure"}">${getIssueCategoryLabel(issue.category)}</span>
+      </div>
+      <strong>${escapeHtml(issue.title)}</strong>
+      <span>${escapeHtml(issue.message)}</span>
+    </div>
+  `;
+}
+
+function countIssuesByCategory(issues) {
+  return issues.reduce((counts, issue) => {
+    const category = issue.category ?? "structure";
+    counts.set(category, (counts.get(category) ?? 0) + 1);
+    return counts;
+  }, new Map());
+}
+
+function getIssueSeverityLabel(level) {
+  return issueSeverityLabels[level] ?? level ?? "Issue";
+}
+
+function getIssueCategoryLabel(category) {
+  return issueCategoryLabels[category] ?? issueCategoryLabels.structure;
+}
+
+function getIssueLevelClass(level) {
+  return level === "error" ? "error" : level === "info" ? "info" : "warning";
 }
 
 function renderExplorer(aasPackage, query = "") {
@@ -2437,12 +2497,57 @@ function requireField(entity, field, path, issues) {
   }
 }
 
-function errorIssue(title, message) {
-  return { level: "error", title, message };
+function errorIssue(title, message, category) {
+  return createIssue("error", title, message, category);
 }
 
-function warnIssue(title, message) {
-  return { level: "warning", title, message };
+function warnIssue(title, message, category) {
+  return createIssue("warning", title, message, category);
+}
+
+function infoIssue(title, message, category) {
+  return createIssue("info", title, message, category);
+}
+
+function createIssue(level, title, message, category) {
+  return {
+    level,
+    severity: level,
+    category: category ?? inferIssueCategory(title, message),
+    title,
+    message,
+  };
+}
+
+function inferIssueCategory(title, message) {
+  const text = `${title} ${message}`.toLowerCase();
+  if (text.includes("reference") || text.includes("referenz") || text.includes("key.")) return "references";
+  if (
+    text.includes("valuetype") ||
+    text.includes("datatype") ||
+    text.includes("wert") ||
+    text.includes("xs:") ||
+    text.includes("contenttype") ||
+    text.includes("language")
+  ) {
+    return "datatypes";
+  }
+  if (
+    text.includes("semanticid") ||
+    text.includes("globalassetid") ||
+    text.includes("interoperabilitaet")
+  ) {
+    return "interoperability";
+  }
+  if (
+    text.includes("assetkind") ||
+    text.includes("entitytype") ||
+    text.includes("typevaluelist") ||
+    text.includes("qualifier")
+  ) {
+    return "semantics";
+  }
+  return "structure";
 }
 
 function referenceTo(type, value) {

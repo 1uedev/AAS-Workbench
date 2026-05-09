@@ -34,15 +34,15 @@ aasx/data.json
 
 ## PDF-Export
 
-Der PDF-Export erzeugt einen kompakten Report zur aktuell geladenen AAS-Umgebung mit Dateiinfo, Validierungsstatus, Kennzahlen, AAS-IDs, referenzierten Submodels und Submodel Elements.
+Der PDF-Export erzeugt einen kompakten Report zur aktuell geladenen AAS-Umgebung mit Dateiinfo, Validierungsstatus, Severity-/Kategorieangaben, Kennzahlen, AAS-IDs, referenzierten Submodels und Submodel Elements.
 
 ## Excel-Export
 
-Der Excel-Export erzeugt eine `.xlsx`-Arbeitsmappe mit getrennten Sheets fuer Summary, AAS, Submodels, Elements und Issues. Damit lassen sich AAS-Daten direkt filtern, auswerten und in andere Werkzeuge uebernehmen.
+Der Excel-Export erzeugt eine `.xlsx`-Arbeitsmappe mit getrennten Sheets fuer Summary, AAS, Submodels, Elements und Issues inklusive Severity und Kategorie. Damit lassen sich AAS-Daten direkt filtern, auswerten und in andere Werkzeuge uebernehmen.
 
 ## Validierung
 
-Die Validierung prueft zentrale AAS-3.x-Regeln: Pflichtfelder, `modelType`, `idShort`, Reference-/Key-Struktur, Submodel-Referenzen, `DataTypeDefXsd`-Werte sowie verschachtelte Submodel Elements wie Collections, Lists, Entities, Operations, Events und Relationships.
+Die Validierung prueft zentrale AAS-3.x-Regeln: Pflichtfelder, `modelType`, `idShort`, Reference-/Key-Struktur, Submodel-Referenzen, `DataTypeDefXsd`-Werte sowie verschachtelte Submodel Elements wie Collections, Lists, Entities, Operations, Events und Relationships. Issues werden nach Severity und Kategorien wie Struktur, Referenzen, Datentypen, Semantik und Interoperabilitaet ausgewiesen.
 
 ## Generator und Gateway
 
