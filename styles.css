@@ -857,6 +857,11 @@ body[data-route="repository"] [data-panel="status"] {
   color: #6941c6;
 }
 
+.issue-badge.category-units {
+  background: #e8f5f2;
+  color: #087569;
+}
+
 .issue-badge.category-interoperability {
   background: #fff1e6;
   color: #b54708;

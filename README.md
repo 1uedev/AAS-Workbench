@@ -46,7 +46,7 @@ Der Validierungsreport-Export erzeugt eine maschinenlesbare JSON-Datei mit Schem
 
 ## Validierung
 
-Die Validierung prueft zentrale AAS-3.x-Regeln: Pflichtfelder, `modelType`, `idShort`, Reference-/Key-Struktur, Submodel-Referenzen, `DataTypeDefXsd`-Werte sowie verschachtelte Submodel Elements wie Collections, Lists, Entities, Operations, Events und Relationships. Issues werden nach Severity und Kategorien wie Struktur, Referenzen, Datentypen, Semantik und Interoperabilitaet ausgewiesen.
+Die Validierung prueft zentrale AAS-3.x-Regeln: Pflichtfelder, `modelType`, `idShort`, Reference-/Key-Struktur, lokale ModelReference-Ziele, Submodel-Referenzen, `semanticId`-Ziele, lokale ConceptDescriptions, globale Semantic-ID-Kennungen, `DataTypeDefXsd`-Werte inklusive Wertebereich und Lexik, Unit-Qualifier sowie verschachtelte Submodel Elements wie Collections, Lists, Entities, Operations, Events und Relationships. Issues werden nach Severity und Kategorien wie Struktur, Referenzen, Datentypen, Semantik, Units und Interoperabilitaet ausgewiesen.
 
 ## Generator und Gateway
 
@@ -123,6 +123,5 @@ Jedes Beispiel ist als `.json` und als importierbares `.aasx` vorhanden.
 ## Nächste sinnvolle Ausbaustufen
 
 - Live-Gateway-Backend fuer OPC UA und MQTT
-- Tiefere `semanticId`- und Referenzpruefungen
-- Submodel-Template-Katalog
+- Submodel-Template-Katalog und semantische Mapping-Hilfen
 - Backend-API mit Repository und Versionierung

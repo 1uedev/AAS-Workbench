@@ -42,6 +42,30 @@
   - Category badges in the validation UI
   - Severity/category columns in Excel export
   - Severity/category labels in PDF export
+- Added deeper `semanticId` validation:
+  - Local ConceptDescription target checks
+  - Duplicate ConceptDescription ID/idShort checks
+  - GlobalReference and ConceptDescription semantic target classification
+  - External/global semantic identifier shape checks
+  - Warnings for ambiguous semantic IDs that are neither local nor globally identifiable
+- Added deeper reference validation:
+  - ModelReference root and fragment key checks
+  - ExternalReference key shape checks
+  - Local AAS/Submodel/ConceptDescription target checks
+  - SubmodelElement reference path checks
+  - Relationship and event reference type checks
+- Added deeper datatype validation:
+  - Scalar value enforcement
+  - Integer bounds for XSD integer subtypes
+  - Calendar, time, duration, binary and URI lexical checks
+  - Range min/max ordering checks
+  - valueId reference checks
+- Added deeper unit validation:
+  - Dedicated unit issue category
+  - unit qualifier value/valueType checks
+  - Duplicate unit qualifier warnings
+  - Common unit symbol checks
+  - Measurement-like numeric values without unit warnings
 - Added explorer view for AAS, Submodels and Properties.
 - Added search over loaded AAS structure.
 - Added JSON export.
@@ -109,6 +133,8 @@
   - AAS 3.x validation status after sample loading
   - Validation category UI smoke test without console errors
   - Validation report JSON export button enables after sample loading
+  - Deeper semanticId validation keeps sample AAS valid without console errors
+  - Deeper reference/datatype/unit validation keeps sample AAS valid without console errors
 - Browser check for enabled PDF export after sample loading
 - Node-generated PDF report rendered with Quick Look for visual inspection
 - Node-generated PDF report with validation category labels

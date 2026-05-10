@@ -206,6 +206,7 @@ function formatIssueCategory(category) {
     references: "Referenzen",
     datatypes: "Datentypen",
     semantics: "Semantik",
+    units: "Units",
     interoperability: "Interoperabilitaet",
   };
   return labels[category] ?? labels.structure;

@@ -191,10 +191,115 @@ const issueCategoryLabels = {
   references: "Referenzen",
   datatypes: "Datentypen",
   semantics: "Semantik",
+  units: "Units",
   interoperability: "Interoperabilitaet",
 };
 
-const issueCategoryOrder = ["structure", "references", "datatypes", "semantics", "interoperability"];
+const issueCategoryOrder = ["structure", "references", "datatypes", "semantics", "units", "interoperability"];
+
+const knownSemanticIdPrefixes = [
+  "https://admin-shell.io/",
+  "http://admin-shell.io/",
+  "https://admin-shell.io/idta/",
+  "https://admin-shell.io/zvei/",
+  "https://industrialdigitaltwin.org/",
+  "https://www.hsu-hh.de/aut/aas/",
+];
+
+const modelReferenceRootKeyTypes = new Set(["AssetAdministrationShell", "ConceptDescription", "Submodel"]);
+const modelReferenceFragmentKeyTypes = new Set([
+  "AnnotatedRelationshipElement",
+  "BasicEventElement",
+  "Blob",
+  "Capability",
+  "Entity",
+  "File",
+  "FragmentReference",
+  "MultiLanguageProperty",
+  "Operation",
+  "Property",
+  "Range",
+  "ReferenceElement",
+  "RelationshipElement",
+  "SubmodelElement",
+  "SubmodelElementCollection",
+  "SubmodelElementList",
+]);
+const externalReferenceKeyTypes = new Set(["GlobalReference", "FragmentReference"]);
+const numericValueTypes = new Set([
+  "xs:byte",
+  "xs:decimal",
+  "xs:double",
+  "xs:float",
+  "xs:int",
+  "xs:integer",
+  "xs:long",
+  "xs:negativeInteger",
+  "xs:nonNegativeInteger",
+  "xs:nonPositiveInteger",
+  "xs:positiveInteger",
+  "xs:short",
+  "xs:unsignedByte",
+  "xs:unsignedInt",
+  "xs:unsignedLong",
+  "xs:unsignedShort",
+]);
+const integerValueTypes = new Set([
+  "xs:byte",
+  "xs:int",
+  "xs:integer",
+  "xs:long",
+  "xs:negativeInteger",
+  "xs:nonNegativeInteger",
+  "xs:nonPositiveInteger",
+  "xs:positiveInteger",
+  "xs:short",
+  "xs:unsignedByte",
+  "xs:unsignedInt",
+  "xs:unsignedLong",
+  "xs:unsignedShort",
+]);
+const integerValueBounds = {
+  "xs:byte": [-128n, 127n],
+  "xs:short": [-32768n, 32767n],
+  "xs:int": [-2147483648n, 2147483647n],
+  "xs:long": [-9223372036854775808n, 9223372036854775807n],
+  "xs:unsignedByte": [0n, 255n],
+  "xs:unsignedShort": [0n, 65535n],
+  "xs:unsignedInt": [0n, 4294967295n],
+  "xs:unsignedLong": [0n, 18446744073709551615n],
+};
+const commonUnitSymbols = new Set([
+  "%",
+  "1",
+  "A",
+  "Hz",
+  "K",
+  "Pa",
+  "V",
+  "W",
+  "bar",
+  "cm",
+  "count",
+  "g",
+  "h",
+  "kg",
+  "kPa",
+  "kV",
+  "kW",
+  "kWh",
+  "kWh/part",
+  "m",
+  "m/s",
+  "min",
+  "mm",
+  "ms",
+  "part",
+  "parts",
+  "parts/h",
+  "rpm",
+  "s",
+]);
 
 const sampleCsv = `assetId,assetName,submodelId,submodelName,idShort,valueType,value,semanticId,unit
 urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:TechnicalData,Technical Data,Manufacturer,string,ACME Industrial,https://admin-shell.io/idta/Manufacturer,
@@ -1541,6 +1646,8 @@ function validateAasPackage(aasPackage) {
   const submodels = Array.isArray(aasPackage.submodels) ? aasPackage.submodels : [];
   const conceptDescriptions = Array.isArray(aasPackage.conceptDescriptions) ? aasPackage.conceptDescriptions : [];
   const submodelIds = new Set(submodels.map((submodel) => submodel.id).filter(Boolean));
+  const semanticContext = createSemanticContext(conceptDescriptions);
+  const referenceContext = createReferenceContext(shells, submodels, conceptDescriptions);
   const elementCount = countSubmodelElements(submodels);
 
   if (!Array.isArray(aasPackage.assetAdministrationShells)) {
@@ -1566,7 +1673,10 @@ function validateAasPackage(aasPackage) {
     requireField(shell, "id", path, issues);
     requireField(shell, "idShort", path, issues);
     validateIdShort(shell.idShort, `${path}.idShort`, issues);
-    validateAssetInformation(shell.assetInformation, `${path}.assetInformation`, issues);
+    validateAssetInformation(shell.assetInformation, `${path}.assetInformation`, issues, {
+      referenceContext,
+      semanticContext,
+    });
 
     if (shell.submodels !== undefined && !Array.isArray(shell.submodels)) {
       issues.push(errorIssue(`${path}.submodels`, "Submodel-Referenzen muessen ein Array sein."));
@@ -1577,6 +1687,8 @@ function validateAasPackage(aasPackage) {
       validateReference(reference, referencePath, issues, {
         expectedKeyType: "Submodel",
         expectedReferenceType: "ModelReference",
+        referenceContext,
+        skipLocalTargetWarning: true,
       });
       const target = reference.keys?.at(-1)?.value;
       if (target && !submodelIds.has(target)) {
@@ -1596,12 +1708,15 @@ function validateAasPackage(aasPackage) {
     requireField(submodel, "id", path, issues);
     requireField(submodel, "idShort", path, issues);
     validateIdShort(submodel.idShort, `${path}.idShort`, issues);
-    validateReferenceIfPresent(submodel.semanticId, `${path}.semanticId`, issues);
+    validateSemanticIdIfPresent(submodel.semanticId, `${path}.semanticId`, issues, semanticContext, referenceContext);
 
     if (submodel.submodelElements !== undefined && !Array.isArray(submodel.submodelElements)) {
       issues.push(errorIssue(`${path}.submodelElements`, "submodelElements muss ein Array sein."));
     } else {
-      validateSubmodelElements(submodel.submodelElements ?? [], `${path}.submodelElements`, issues);
+      validateSubmodelElements(submodel.submodelElements ?? [], `${path}.submodelElements`, issues, {
+        semanticContext,
+        referenceContext,
+      });
     }
   });
 
@@ -1615,6 +1730,7 @@ function validateAasPackage(aasPackage) {
     validateModelType(conceptDescription, "ConceptDescription", path, issues);
     requireField(conceptDescription, "id", path, issues);
     if (conceptDescription.idShort) validateIdShort(conceptDescription.idShort, `${path}.idShort`, issues);
+    validateConceptDescriptionUniqueness(conceptDescription, path, issues, semanticContext);
   });
 
   return {
@@ -1625,6 +1741,206 @@ function validateAasPackage(aasPackage) {
       elements: elementCount,
     },
   };
+}
+
+function createSemanticContext(conceptDescriptions) {
+  const idCounts = new Map();
+  const idShortCounts = new Map();
+
+  conceptDescriptions.forEach((conceptDescription) => {
+    if (conceptDescription?.id) {
+      idCounts.set(conceptDescription.id, (idCounts.get(conceptDescription.id) ?? 0) + 1);
+    }
+    if (conceptDescription?.idShort) {
+      idShortCounts.set(conceptDescription.idShort, (idShortCounts.get(conceptDescription.idShort) ?? 0) + 1);
+    }
+  });
+
+  return {
+    conceptDescriptionIds: new Set(idCounts.keys()),
+    conceptDescriptionIdShorts: new Set(idShortCounts.keys()),
+    conceptDescriptionIdCounts: idCounts,
+    conceptDescriptionIdShortCounts: idShortCounts,
+  };
+}
+
+function createReferenceContext(shells, submodels, conceptDescriptions) {
+  const rootIdsByType = new Map([
+    ["AssetAdministrationShell", new Set(shells.map((shell) => shell.id).filter(Boolean))],
+    ["Submodel", new Set(submodels.map((submodel) => submodel.id).filter(Boolean))],
+    ["ConceptDescription", new Set(conceptDescriptions.map((conceptDescription) => conceptDescription.id).filter(Boolean))],
+  ]);
+  const submodelsById = new Map(submodels.map((submodel) => [submodel.id, submodel]).filter(([id]) => Boolean(id)));
+
+  return {
+    rootIdsByType,
+    submodelsById,
+  };
+}
+
+function validateConceptDescriptionUniqueness(conceptDescription, path, issues, semanticContext) {
+  if (conceptDescription.id && semanticContext.conceptDescriptionIdCounts.get(conceptDescription.id) > 1) {
+    issues.push(errorIssue(path, `Doppelte ConceptDescription-ID: ${conceptDescription.id}`, "semantics"));
+  }
+
+  if (
+    conceptDescription.idShort &&
+    semanticContext.conceptDescriptionIdShortCounts.get(conceptDescription.idShort) > 1
+  ) {
+    issues.push(warnIssue(path, `Doppeltes ConceptDescription-idShort: ${conceptDescription.idShort}`, "semantics"));
+  }
+}
+
+function validateSemanticIdIfPresent(reference, path, issues, semanticContext, referenceContext) {
+  if (reference === undefined || reference === null || reference === "") return;
+  validateSemanticId(reference, path, issues, semanticContext, referenceContext);
+}
+
+function validateSemanticId(reference, path, issues, semanticContext = createSemanticContext([]), referenceContext) {
+  validateReference(reference, path, issues, {
+    allowExternalConceptDescription: true,
+    category: "semantics",
+    referenceContext,
+  });
+  if (!isPlainObject(reference) || !Array.isArray(reference.keys) || reference.keys.length === 0) return;
+
+  if (reference.keys.length > 1) {
+    issues.push(
+      warnIssue(
+        path,
+        "semanticId enthaelt mehrere Keys; fuer interoperable Semantic IDs sollte die Ziel-ConceptDescription eindeutig sein.",
+        "semantics",
+      ),
+    );
+  }
+
+  const lastKey = reference.keys.at(-1);
+  if (!isPlainObject(lastKey) || !lastKey.value) return;
+
+  const value = String(lastKey.value).trim();
+  if (value !== lastKey.value) {
+    issues.push(warnIssue(path, "semanticId-Key.value enthaelt fuehrende oder folgende Leerzeichen.", "semantics"));
+  }
+
+  if (isHttpUrl(value) && !isValidUrl(value)) {
+    issues.push(errorIssue(path, `semanticId-URL ist ungueltig: ${value}`, "semantics"));
+    return;
+  }
+
+  const pointsToLocalConcept = semanticContext.conceptDescriptionIds.has(value);
+  const pointsToLocalIdShort = semanticContext.conceptDescriptionIdShorts.has(value);
+  const globalSemanticId = isGlobalSemanticId(value);
+
+  if (lastKey.type === "ConceptDescription") {
+    validateConceptDescriptionSemanticId(reference, path, issues, {
+      value,
+      pointsToLocalConcept,
+      pointsToLocalIdShort,
+      globalSemanticId,
+    });
+    return;
+  }
+
+  if (lastKey.type === "GlobalReference") {
+    validateGlobalReferenceSemanticId(reference, path, issues, value, globalSemanticId);
+    return;
+  }
+
+  issues.push(
+    warnIssue(
+      path,
+      `semanticId sollte auf ConceptDescription oder GlobalReference zeigen, nicht auf ${lastKey.type ?? "unbekannt"}.`,
+      "semantics",
+    ),
+  );
+}
+
+function validateConceptDescriptionSemanticId(reference, path, issues, context) {
+  if (context.pointsToLocalConcept) {
+    if (reference.type !== "ModelReference") {
+      issues.push(
+        warnIssue(
+          path,
+          "Lokale ConceptDescription-Verweise sollten als ModelReference modelliert werden.",
+          "semantics",
+        ),
+      );
+    }
+    return;
+  }
+
+  if (context.pointsToLocalIdShort) {
+    issues.push(
+      warnIssue(
+        path,
+        `semanticId nutzt ein ConceptDescription-idShort (${context.value}); robuster ist die ConceptDescription-ID.`,
+        "semantics",
+      ),
+    );
+    return;
+  }
+
+  if (context.globalSemanticId) {
+    if (reference.type !== "ExternalReference") {
+      issues.push(
+        warnIssue(
+          path,
+          "Externe semanticId-Verweise sollten als ExternalReference modelliert werden.",
+          "semantics",
+        ),
+      );
+    }
+    return;
+  }
+
+  issues.push(
+    warnIssue(
+      path,
+      `semanticId verweist auf ConceptDescription "${context.value}", die nicht im Package vorhanden ist und nicht wie eine globale ID aussieht.`,
+      "semantics",
+    ),
+  );
+}
+
+function validateGlobalReferenceSemanticId(reference, path, issues, value, globalSemanticId) {
+  if (reference.type !== "ExternalReference") {
+    issues.push(
+      warnIssue(path, "GlobalReference semanticIds sollten als ExternalReference modelliert werden.", "semantics"),
+    );
+  }
+
+  if (!globalSemanticId) {
+    issues.push(
+      warnIssue(
+        path,
+        `GlobalReference semanticId "${value}" sollte eine IRI, URN oder IRDI-aehnliche globale Kennung sein.`,
+        "semantics",
+      ),
+    );
+  }
+}
+
+function isGlobalSemanticId(value) {
+  return (
+    knownSemanticIdPrefixes.some((prefix) => value.startsWith(prefix)) ||
+    isHttpUrl(value) ||
+    /^urn:/i.test(value) ||
+    /^irdi:/i.test(value) ||
+    /^\d{4}-\d#/.test(value)
+  );
+}
+
+function isHttpUrl(value) {
+  return /^https?:\/\//i.test(value);
+}
+
+function isValidUrl(value) {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function validateModelType(entity, expectedModelType, path, issues) {
@@ -1682,12 +1998,12 @@ function validateSubmodelElement(element, path, issues, options = {}) {
   }
 
   if (element.semanticId) {
-    validateReference(element.semanticId, `${path}.semanticId`, issues);
+    validateSemanticId(element.semanticId, `${path}.semanticId`, issues, options.semanticContext, options.referenceContext);
   } else {
     issues.push(warnIssue(path, "semanticId fehlt; Interoperabilitaet ist eingeschraenkt."));
   }
 
-  validateQualifiers(element.qualifiers, `${path}.qualifiers`, issues);
+  validateQualifiers(element.qualifiers, `${path}.qualifiers`, issues, options);
 
   switch (element.modelType) {
     case "Property":
@@ -1704,26 +2020,26 @@ function validateSubmodelElement(element, path, issues, options = {}) {
       validateContentElement(element, path, issues);
       break;
     case "ReferenceElement":
-      validateReferenceIfPresent(element.value, `${path}.value`, issues);
+      validateReferenceIfPresent(element.value, `${path}.value`, issues, { referenceContext: options.referenceContext });
       break;
     case "RelationshipElement":
     case "AnnotatedRelationshipElement":
-      validateRelationshipElement(element, path, issues);
+      validateRelationshipElement(element, path, issues, options);
       break;
     case "Entity":
-      validateEntity(element, path, issues);
+      validateEntity(element, path, issues, options);
       break;
     case "SubmodelElementCollection":
-      validateCollection(element, path, issues);
+      validateCollection(element, path, issues, options);
       break;
     case "SubmodelElementList":
-      validateElementList(element, path, issues);
+      validateElementList(element, path, issues, options);
       break;
     case "Operation":
-      validateOperation(element, path, issues);
+      validateOperation(element, path, issues, options);
       break;
     case "BasicEventElement":
-      validateBasicEventElement(element, path, issues);
+      validateBasicEventElement(element, path, issues, options);
       break;
     default:
       break;
@@ -1738,6 +2054,8 @@ function validateProperty(element, path, issues) {
 
   validateValueType(element.valueType, `${path}.valueType`, issues);
   validatePropertyValueByType(element.value, element.valueType, `${path}.value`, issues);
+  validateValueId(element.valueId, `${path}.valueId`, issues);
+  validateElementUnit(element, path, issues);
 }
 
 function validateRange(element, path, issues) {
@@ -1749,6 +2067,8 @@ function validateRange(element, path, issues) {
   validateValueType(element.valueType, `${path}.valueType`, issues);
   validatePropertyValueByType(element.min, element.valueType, `${path}.min`, issues);
   validatePropertyValueByType(element.max, element.valueType, `${path}.max`, issues);
+  validateRangeOrder(element, path, issues);
+  validateElementUnit(element, path, issues);
 }
 
 function validateMultiLanguageProperty(element, path, issues) {
@@ -1780,20 +2100,29 @@ function validateContentElement(element, path, issues) {
   }
 }
 
-function validateRelationshipElement(element, path, issues) {
-  validateRequiredReference(element.first, `${path}.first`, issues);
-  validateRequiredReference(element.second, `${path}.second`, issues);
+function validateRelationshipElement(element, path, issues, options = {}) {
+  validateRequiredReference(element.first, `${path}.first`, issues, {
+    expectedReferenceType: "ModelReference",
+    referenceContext: options.referenceContext,
+  });
+  validateRequiredReference(element.second, `${path}.second`, issues, {
+    expectedReferenceType: "ModelReference",
+    referenceContext: options.referenceContext,
+  });
 
   if (element.modelType === "AnnotatedRelationshipElement") {
     if (element.annotations !== undefined && !Array.isArray(element.annotations)) {
       issues.push(errorIssue(`${path}.annotations`, "annotations muss ein Array sein."));
     } else {
-      validateSubmodelElements(element.annotations ?? [], `${path}.annotations`, issues);
+      validateSubmodelElements(element.annotations ?? [], `${path}.annotations`, issues, {
+        semanticContext: options.semanticContext,
+        referenceContext: options.referenceContext,
+      });
     }
   }
 }
 
-function validateEntity(element, path, issues) {
+function validateEntity(element, path, issues, options = {}) {
   if (!element.entityType) {
     issues.push(errorIssue(path, "Entity ohne entityType."));
   } else if (!entityTypes.has(element.entityType)) {
@@ -1803,7 +2132,10 @@ function validateEntity(element, path, issues) {
   if (element.statements !== undefined && !Array.isArray(element.statements)) {
     issues.push(errorIssue(`${path}.statements`, "statements muss ein Array sein."));
   } else {
-    validateSubmodelElements(element.statements ?? [], `${path}.statements`, issues);
+    validateSubmodelElements(element.statements ?? [], `${path}.statements`, issues, {
+      semanticContext: options.semanticContext,
+      referenceContext: options.referenceContext,
+    });
   }
 
   if (element.entityType === "SelfManagedEntity" && !element.globalAssetId && !element.specificAssetIds) {
@@ -1811,16 +2143,19 @@ function validateEntity(element, path, issues) {
   }
 }
 
-function validateCollection(element, path, issues) {
+function validateCollection(element, path, issues, options = {}) {
   if (element.value !== undefined && !Array.isArray(element.value)) {
     issues.push(errorIssue(`${path}.value`, "SubmodelElementCollection.value muss ein Array sein."));
     return;
   }
 
-  validateSubmodelElements(element.value ?? [], `${path}.value`, issues);
+  validateSubmodelElements(element.value ?? [], `${path}.value`, issues, {
+    semanticContext: options.semanticContext,
+    referenceContext: options.referenceContext,
+  });
 }
 
-function validateElementList(element, path, issues) {
+function validateElementList(element, path, issues, options = {}) {
   if (element.value !== undefined && !Array.isArray(element.value)) {
     issues.push(errorIssue(`${path}.value`, "SubmodelElementList.value muss ein Array sein."));
     return;
@@ -1835,6 +2170,8 @@ function validateElementList(element, path, issues) {
   validateSubmodelElements(element.value ?? [], `${path}.value`, issues, {
     requireIdShort: false,
     enforceUniqueIdShort: false,
+    semanticContext: options.semanticContext,
+    referenceContext: options.referenceContext,
   });
 
   if (element.typeValueList) {
@@ -1851,13 +2188,13 @@ function validateElementList(element, path, issues) {
   }
 }
 
-function validateOperation(element, path, issues) {
-  validateOperationVariables(element.inputVariables, `${path}.inputVariables`, issues);
-  validateOperationVariables(element.outputVariables, `${path}.outputVariables`, issues);
-  validateOperationVariables(element.inoutputVariables, `${path}.inoutputVariables`, issues);
+function validateOperation(element, path, issues, options = {}) {
+  validateOperationVariables(element.inputVariables, `${path}.inputVariables`, issues, options);
+  validateOperationVariables(element.outputVariables, `${path}.outputVariables`, issues, options);
+  validateOperationVariables(element.inoutputVariables, `${path}.inoutputVariables`, issues, options);
 }
 
-function validateOperationVariables(variables, path, issues) {
+function validateOperationVariables(variables, path, issues, options = {}) {
   if (variables === undefined) return;
   if (!Array.isArray(variables)) {
     issues.push(errorIssue(path, "OperationVariables muessen ein Array sein."));
@@ -1873,13 +2210,20 @@ function validateOperationVariables(variables, path, issues) {
     if (!variable.value) {
       issues.push(errorIssue(variablePath, "OperationVariable.value fehlt."));
     } else {
-      validateSubmodelElement(variable.value, `${variablePath}.value`, issues, { requireIdShort: false });
+      validateSubmodelElement(variable.value, `${variablePath}.value`, issues, {
+        requireIdShort: false,
+        semanticContext: options.semanticContext,
+        referenceContext: options.referenceContext,
+      });
     }
   });
 }
 
-function validateBasicEventElement(element, path, issues) {
-  validateRequiredReference(element.observed, `${path}.observed`, issues, { expectedReferenceType: "ModelReference" });
+function validateBasicEventElement(element, path, issues, options = {}) {
+  validateRequiredReference(element.observed, `${path}.observed`, issues, {
+    expectedReferenceType: "ModelReference",
+    referenceContext: options.referenceContext,
+  });
 
   if (element.direction && !eventDirections.has(element.direction)) {
     issues.push(errorIssue(`${path}.direction`, `direction "${element.direction}" ist nicht gueltig.`));
@@ -1890,7 +2234,7 @@ function validateBasicEventElement(element, path, issues) {
   }
 }
 
-function validateAssetInformation(assetInformation, path, issues) {
+function validateAssetInformation(assetInformation, path, issues, options = {}) {
   if (!isPlainObject(assetInformation)) {
     issues.push(errorIssue(path, "assetInformation fehlt oder ist kein Objekt."));
     return;
@@ -1908,7 +2252,33 @@ function validateAssetInformation(assetInformation, path, issues) {
 
   if (assetInformation.specificAssetIds !== undefined && !Array.isArray(assetInformation.specificAssetIds)) {
     issues.push(errorIssue(`${path}.specificAssetIds`, "specificAssetIds muss ein Array sein."));
+  } else {
+    validateSpecificAssetIds(assetInformation.specificAssetIds ?? [], `${path}.specificAssetIds`, issues, options);
   }
+}
+
+function validateSpecificAssetIds(specificAssetIds, path, issues, options = {}) {
+  const seenNames = new Set();
+  specificAssetIds.forEach((specificAssetId, index) => {
+    const assetIdPath = `${path}[${index}]`;
+    if (!isPlainObject(specificAssetId)) {
+      issues.push(errorIssue(assetIdPath, "SpecificAssetId muss ein Objekt sein."));
+      return;
+    }
+    requireField(specificAssetId, "name", assetIdPath, issues);
+    requireField(specificAssetId, "value", assetIdPath, issues);
+    if (specificAssetId.name) {
+      if (seenNames.has(specificAssetId.name)) {
+        issues.push(warnIssue(assetIdPath, `Doppelter SpecificAssetId.name: ${specificAssetId.name}`, "semantics"));
+      }
+      seenNames.add(specificAssetId.name);
+    }
+    validateSemanticIdIfPresent(specificAssetId.semanticId, `${assetIdPath}.semanticId`, issues, options.semanticContext, options.referenceContext);
+    validateReferenceIfPresent(specificAssetId.externalSubjectId, `${assetIdPath}.externalSubjectId`, issues, {
+      expectedReferenceType: "ExternalReference",
+      referenceContext: options.referenceContext,
+    });
+  });
 }
 
 function validateReferenceIfPresent(reference, path, issues, options = {}) {
@@ -1925,55 +2295,211 @@ function validateRequiredReference(reference, path, issues, options = {}) {
 }
 
 function validateReference(reference, path, issues, options = {}) {
+  const category = options.category ?? "references";
   if (!isPlainObject(reference)) {
-    issues.push(errorIssue(path, "Reference muss ein Objekt sein."));
+    issues.push(errorIssue(path, "Reference muss ein Objekt sein.", category));
     return;
   }
 
   if (!reference.type) {
-    issues.push(errorIssue(path, "Reference.type fehlt."));
+    issues.push(errorIssue(path, "Reference.type fehlt.", category));
   } else if (!aasReferenceTypes.has(reference.type)) {
-    issues.push(errorIssue(`${path}.type`, `Reference.type "${reference.type}" ist nicht gueltig.`));
+    issues.push(errorIssue(`${path}.type`, `Reference.type "${reference.type}" ist nicht gueltig.`, category));
   } else if (options.expectedReferenceType && reference.type !== options.expectedReferenceType) {
     issues.push(
-      warnIssue(path, `AAS 3.x erwartet Reference.type "${options.expectedReferenceType}" fuer diese Referenz.`),
+      warnIssue(path, `AAS 3.x erwartet Reference.type "${options.expectedReferenceType}" fuer diese Referenz.`, category),
     );
   }
 
   if (!Array.isArray(reference.keys) || reference.keys.length === 0) {
-    issues.push(errorIssue(path, "Reference.keys muss ein nicht-leeres Array sein."));
+    issues.push(errorIssue(path, "Reference.keys muss ein nicht-leeres Array sein.", category));
     return;
   }
 
   reference.keys.forEach((key, keyIndex) => {
     const keyPath = `${path}.keys[${keyIndex}]`;
     if (!isPlainObject(key)) {
-      issues.push(errorIssue(keyPath, "Key muss ein Objekt sein."));
+      issues.push(errorIssue(keyPath, "Key muss ein Objekt sein.", category));
       return;
     }
     if (!key.type) {
-      issues.push(errorIssue(keyPath, "Key.type fehlt."));
+      issues.push(errorIssue(keyPath, "Key.type fehlt.", category));
     } else if (!aasKeyTypes.has(key.type)) {
-      issues.push(errorIssue(`${keyPath}.type`, `Key.type "${key.type}" ist nicht gueltig.`));
+      issues.push(errorIssue(`${keyPath}.type`, `Key.type "${key.type}" ist nicht gueltig.`, category));
     }
     if (!key.value) {
-      issues.push(errorIssue(keyPath, "Key.value fehlt."));
+      issues.push(errorIssue(keyPath, "Key.value fehlt.", category));
+    } else if (typeof key.value !== "string") {
+      issues.push(errorIssue(`${keyPath}.value`, "Key.value muss ein String sein.", category));
+    } else if (key.value.trim() !== key.value) {
+      issues.push(warnIssue(`${keyPath}.value`, "Key.value enthaelt fuehrende oder folgende Leerzeichen.", category));
     }
   });
 
   const lastKeyType = reference.keys.at(-1)?.type;
   if (options.expectedKeyType && lastKeyType && lastKeyType !== options.expectedKeyType) {
-    issues.push(errorIssue(path, `Letzter Key muss Typ "${options.expectedKeyType}" haben, ist aber "${lastKeyType}".`));
+    issues.push(errorIssue(path, `Letzter Key muss Typ "${options.expectedKeyType}" haben, ist aber "${lastKeyType}".`, category));
+  }
+
+  validateReferenceByType(reference, path, issues, { ...options, category });
+}
+
+function validateReferenceByType(reference, path, issues, options) {
+  if (!Array.isArray(reference.keys) || reference.keys.length === 0) return;
+  if (reference.type === "ModelReference") {
+    validateModelReference(reference, path, issues, options);
+    return;
+  }
+  if (reference.type === "ExternalReference") {
+    validateExternalReference(reference, path, issues, options);
   }
 }
 
-function validateQualifiers(qualifiers, path, issues) {
+function validateModelReference(reference, path, issues, options) {
+  const [firstKey, ...fragmentKeys] = reference.keys;
+  const category = options.category ?? "references";
+
+  if (firstKey?.type && !modelReferenceRootKeyTypes.has(firstKey.type)) {
+    issues.push(
+      errorIssue(
+        `${path}.keys[0].type`,
+        `ModelReference muss mit AssetAdministrationShell, Submodel oder ConceptDescription beginnen, nicht mit ${firstKey.type}.`,
+        category,
+      ),
+    );
+  }
+
+  fragmentKeys.forEach((key, index) => {
+    const keyPath = `${path}.keys[${index + 1}]`;
+    if (key?.type && !modelReferenceFragmentKeyTypes.has(key.type)) {
+      issues.push(
+        errorIssue(
+          `${keyPath}.type`,
+          `Folge-Key in einer ModelReference muss ein Referable/Fragment sein, nicht ${key.type}.`,
+          category,
+        ),
+      );
+    }
+
+    const previousKey = reference.keys[index];
+    if (key?.type === "FragmentReference" && !["Blob", "File"].includes(previousKey?.type)) {
+      issues.push(warnIssue(keyPath, "FragmentReference sollte direkt auf einen File- oder Blob-Key folgen.", category));
+    }
+
+    if (previousKey?.type === "SubmodelElementList" && key?.value && !/^\d+$/.test(String(key.value))) {
+      issues.push(errorIssue(keyPath, "Key.value nach SubmodelElementList muss ein nicht-negativer Integer-Index sein.", category));
+    }
+  });
+
+  validateLocalModelReferenceTarget(reference, path, issues, options);
+}
+
+function validateExternalReference(reference, path, issues, options) {
+  if (options.allowExternalConceptDescription && reference.keys.length === 1 && reference.keys[0]?.type === "ConceptDescription") {
+    return;
+  }
+
+  const category = options.category ?? "references";
+  const firstKey = reference.keys[0];
+  const lastKey = reference.keys.at(-1);
+
+  if (firstKey?.type && !externalReferenceKeyTypes.has(firstKey.type)) {
+    issues.push(
+      warnIssue(
+        `${path}.keys[0].type`,
+        `ExternalReference sollte mit GlobalReference oder FragmentReference beginnen, nicht mit ${firstKey.type}.`,
+        category,
+      ),
+    );
+  }
+
+  if (lastKey?.type && !externalReferenceKeyTypes.has(lastKey.type)) {
+    issues.push(
+      warnIssue(
+        `${path}.keys[${reference.keys.length - 1}].type`,
+        `ExternalReference sollte mit GlobalReference oder FragmentReference enden, nicht mit ${lastKey.type}.`,
+        category,
+      ),
+    );
+  }
+}
+
+function validateLocalModelReferenceTarget(reference, path, issues, options) {
+  const context = options.referenceContext;
+  if (!context || !Array.isArray(reference.keys) || reference.keys.length === 0) return;
+
+  const firstKey = reference.keys[0];
+  const rootIds = context.rootIdsByType.get(firstKey?.type);
+  if (rootIds && firstKey.value && !rootIds.has(firstKey.value) && !options.skipLocalTargetWarning) {
+    issues.push(
+      warnIssue(
+        `${path}.keys[0].value`,
+        `ModelReference-Ziel "${firstKey.value}" wurde im aktuellen Package nicht gefunden.`,
+        options.category ?? "references",
+      ),
+    );
+    return;
+  }
+
+  if (firstKey?.type === "Submodel" && context.submodelsById.has(firstKey.value) && reference.keys.length > 1) {
+    validateSubmodelElementReferencePath(
+      context.submodelsById.get(firstKey.value),
+      reference.keys.slice(1),
+      `${path}.keys`,
+      issues,
+      options.category ?? "references",
+    );
+  }
+}
+
+function validateSubmodelElementReferencePath(submodel, keys, path, issues, category) {
+  let children = submodel.submodelElements ?? [];
+
+  keys.forEach((key, index) => {
+    if (!Array.isArray(children)) return;
+
+    let match;
+    if (index > 0 && keys[index - 1]?.type === "SubmodelElementList") {
+      const listIndex = Number(key.value);
+      match = Number.isInteger(listIndex) && listIndex >= 0 ? children[listIndex] : undefined;
+    } else {
+      match = children.find((child) => child?.idShort === key.value);
+    }
+
+    if (!match) {
+      issues.push(
+        warnIssue(
+          `${path}[${index + 1}].value`,
+          `SubmodelElement-Referenzpfad "${key.value}" wurde im aktuellen Submodel nicht gefunden.`,
+          category,
+        ),
+      );
+      children = null;
+      return;
+    }
+
+    if (key.type && match.modelType && key.type !== "SubmodelElement" && key.type !== match.modelType) {
+      issues.push(
+        warnIssue(
+          `${path}[${index + 1}].type`,
+          `Key.type "${key.type}" passt nicht zum referenzierten Elementtyp "${match.modelType}".`,
+          category,
+        ),
+      );
+    }
+
+    children = getElementChildren(match);
+  });
+}
+
+function validateQualifiers(qualifiers, path, issues, options = {}) {
   if (qualifiers === undefined) return;
   if (!Array.isArray(qualifiers)) {
     issues.push(errorIssue(path, "qualifiers muss ein Array sein."));
     return;
   }
 
+  const seenTypes = new Set();
   qualifiers.forEach((qualifier, qualifierIndex) => {
     const qualifierPath = `${path}[${qualifierIndex}]`;
     if (!isPlainObject(qualifier)) {
@@ -1981,9 +2507,24 @@ function validateQualifiers(qualifiers, path, issues) {
       return;
     }
     requireField(qualifier, "type", qualifierPath, issues);
+    if (qualifier.type) {
+      if (seenTypes.has(qualifier.type)) {
+        issues.push(warnIssue(qualifierPath, `Doppelter Qualifier.type in diesem Element: ${qualifier.type}`, "semantics"));
+      }
+      seenTypes.add(qualifier.type);
+    }
     if (qualifier.valueType) {
       validateValueType(qualifier.valueType, `${qualifierPath}.valueType`, issues);
       validatePropertyValueByType(qualifier.value, qualifier.valueType, `${qualifierPath}.value`, issues);
+    } else if (qualifier.value !== undefined) {
+      issues.push(errorIssue(qualifierPath, "Qualifier mit value braucht valueType.", "datatypes"));
+    }
+
+    validateValueId(qualifier.valueId, `${qualifierPath}.valueId`, issues);
+    validateSemanticIdIfPresent(qualifier.semanticId, `${qualifierPath}.semanticId`, issues, options.semanticContext, options.referenceContext);
+
+    if (qualifier.type === "unit") {
+      validateUnitQualifier(qualifier, qualifierPath, issues);
     }
   });
 }
@@ -1997,80 +2538,217 @@ function validateIdShort(value, path, issues) {
 
 function validateValueType(valueType, path, issues) {
   if (!aasValueTypes.has(valueType)) {
-    issues.push(errorIssue(path, `valueType "${valueType}" ist kein gueltiger AAS-3.x-DataTypeDefXsd.`));
+    issues.push(errorIssue(path, `valueType "${valueType}" ist kein gueltiger AAS-3.x-DataTypeDefXsd.`, "datatypes"));
   }
 }
 
 function validatePropertyValueByType(value, valueType, path, issues) {
   if (value === undefined || value === null || value === "") return;
+  if (!aasValueTypes.has(valueType)) return;
+  if (typeof value === "object") {
+    issues.push(errorIssue(path, `${valueType}-Werte muessen skalar sein, nicht Objekt oder Array.`, "datatypes"));
+    return;
+  }
+
   const raw = String(value);
+  if (raw.trim() !== raw) {
+    issues.push(warnIssue(path, "Wert enthaelt fuehrende oder folgende Leerzeichen.", "datatypes"));
+  }
 
   if (valueType === "xs:boolean" && !["true", "false", "0", "1"].includes(raw.toLowerCase())) {
-    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:boolean.`));
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:boolean.`, "datatypes"));
   }
 
-  const integerTypes = new Set([
-    "xs:byte",
-    "xs:int",
-    "xs:integer",
-    "xs:long",
-    "xs:negativeInteger",
-    "xs:nonNegativeInteger",
-    "xs:nonPositiveInteger",
-    "xs:positiveInteger",
-    "xs:short",
-    "xs:unsignedByte",
-    "xs:unsignedInt",
-    "xs:unsignedLong",
-    "xs:unsignedShort",
-  ]);
-
-  if (integerTypes.has(valueType) && !/^-?\d+$/.test(raw)) {
-    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu ${valueType}.`));
+  if (integerValueTypes.has(valueType)) {
+    validateIntegerValue(raw, valueType, path, issues);
   }
 
-  if (
-    ["xs:decimal", "xs:double", "xs:float"].includes(valueType) &&
-    !Number.isFinite(Number(raw))
-  ) {
-    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu ${valueType}.`));
+  if (valueType === "xs:decimal" && !/^[+-]?((\d+(\.\d*)?)|(\.\d+))$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:decimal.`, "datatypes"));
   }
 
-  if (valueType === "xs:positiveInteger" && /^-?\d+$/.test(raw) && Number(raw) <= 0) {
-    issues.push(errorIssue(path, `Wert "${raw}" muss groesser als 0 sein.`));
+  if (["xs:double", "xs:float"].includes(valueType) && !Number.isFinite(Number(raw))) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu ${valueType}.`, "datatypes"));
   }
 
-  if (["xs:nonNegativeInteger", "xs:unsignedByte", "xs:unsignedInt", "xs:unsignedLong", "xs:unsignedShort"].includes(valueType) && /^-?\d+$/.test(raw) && Number(raw) < 0) {
-    issues.push(errorIssue(path, `Wert "${raw}" darf nicht negativ sein.`));
+  if (valueType === "xs:date" && !isValidIsoDate(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:date.`, "datatypes"));
   }
 
-  if (valueType === "xs:negativeInteger" && /^-?\d+$/.test(raw) && Number(raw) >= 0) {
-    issues.push(errorIssue(path, `Wert "${raw}" muss negativ sein.`));
+  if (valueType === "xs:dateTime" && !isValidIsoDateTime(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:dateTime.`, "datatypes"));
   }
 
-  if (valueType === "xs:nonPositiveInteger" && /^-?\d+$/.test(raw) && Number(raw) > 0) {
-    issues.push(errorIssue(path, `Wert "${raw}" darf nicht positiv sein.`));
+  if (valueType === "xs:time" && !isValidIsoTime(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:time.`, "datatypes"));
   }
 
-  if (valueType === "xs:date" && !/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:date.`));
-  }
-
-  if (valueType === "xs:dateTime" && Number.isNaN(Date.parse(raw))) {
-    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:dateTime.`));
-  }
-
-  if (valueType === "xs:time" && !/^\d{2}:\d{2}:\d{2}/.test(raw)) {
-    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:time.`));
-  }
-
-  if (valueType === "xs:duration" && !/^-?P/.test(raw)) {
-    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:duration.`));
+  if (valueType === "xs:duration" && !/^-?P(?=\d|T\d)(\d+Y)?(\d+M)?(\d+D)?(T(\d+H)?(\d+M)?(\d+(\.\d+)?S)?)?$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:duration.`, "datatypes"));
   }
 
   if (valueType === "xs:anyURI" && /\s/.test(raw)) {
-    issues.push(errorIssue(path, `Wert "${raw}" enthaelt Leerzeichen und passt nicht zu xs:anyURI.`));
+    issues.push(errorIssue(path, `Wert "${raw}" enthaelt Leerzeichen und passt nicht zu xs:anyURI.`, "datatypes"));
   }
+
+  if (valueType === "xs:hexBinary" && !/^[0-9A-Fa-f]*$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:hexBinary.`, "datatypes"));
+  } else if (valueType === "xs:hexBinary" && raw.length % 2 !== 0) {
+    issues.push(errorIssue(path, "xs:hexBinary braucht eine gerade Anzahl Hex-Zeichen.", "datatypes"));
+  }
+
+  if (valueType === "xs:base64Binary" && !isValidBase64(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:base64Binary.`, "datatypes"));
+  }
+
+  validateGregorianValue(raw, valueType, path, issues);
+}
+
+function validateIntegerValue(raw, valueType, path, issues) {
+  if (!/^[+-]?\d+$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu ${valueType}.`, "datatypes"));
+    return;
+  }
+
+  const value = BigInt(raw);
+  if (valueType === "xs:positiveInteger" && value <= 0n) {
+    issues.push(errorIssue(path, `Wert "${raw}" muss groesser als 0 sein.`, "datatypes"));
+  }
+  if (valueType === "xs:negativeInteger" && value >= 0n) {
+    issues.push(errorIssue(path, `Wert "${raw}" muss negativ sein.`, "datatypes"));
+  }
+  if (valueType === "xs:nonNegativeInteger" && value < 0n) {
+    issues.push(errorIssue(path, `Wert "${raw}" darf nicht negativ sein.`, "datatypes"));
+  }
+  if (valueType === "xs:nonPositiveInteger" && value > 0n) {
+    issues.push(errorIssue(path, `Wert "${raw}" darf nicht positiv sein.`, "datatypes"));
+  }
+
+  const bounds = integerValueBounds[valueType];
+  if (bounds && (value < bounds[0] || value > bounds[1])) {
+    issues.push(errorIssue(path, `Wert "${raw}" liegt ausserhalb des Wertebereichs von ${valueType}.`, "datatypes"));
+  }
+}
+
+function validateGregorianValue(raw, valueType, path, issues) {
+  if (valueType === "xs:gYear" && !/^-?\d{4,}(Z|[+-]\d{2}:\d{2})?$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:gYear.`, "datatypes"));
+  }
+  if (valueType === "xs:gYearMonth" && !/^-?\d{4,}-(0[1-9]|1[0-2])(Z|[+-]\d{2}:\d{2})?$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:gYearMonth.`, "datatypes"));
+  }
+  if (valueType === "xs:gMonth" && !/^--(0[1-9]|1[0-2])(Z|[+-]\d{2}:\d{2})?$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:gMonth.`, "datatypes"));
+  }
+  if (valueType === "xs:gDay" && !/^---(0[1-9]|[12]\d|3[01])(Z|[+-]\d{2}:\d{2})?$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:gDay.`, "datatypes"));
+  }
+  if (valueType === "xs:gMonthDay" && !/^--(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])(Z|[+-]\d{2}:\d{2})?$/.test(raw)) {
+    issues.push(errorIssue(path, `Wert "${raw}" passt nicht zu xs:gMonthDay.`, "datatypes"));
+  }
+}
+
+function validateRangeOrder(element, path, issues) {
+  const comparison = compareTypedValues(element.min, element.max, element.valueType);
+  if (comparison !== null && comparison > 0) {
+    issues.push(errorIssue(path, "Range.min darf nicht groesser als Range.max sein.", "datatypes"));
+  }
+}
+
+function validateValueId(reference, path, issues) {
+  validateReferenceIfPresent(reference, path, issues, { category: "references" });
+}
+
+function validateElementUnit(element, path, issues) {
+  const unitQualifiers = (element.qualifiers ?? []).filter((qualifier) => qualifier?.type === "unit");
+  if (unitQualifiers.length > 1) {
+    issues.push(warnIssue(path, "Mehrere unit-Qualifier gefunden; eine eindeutige Einheit ist robuster.", "units"));
+  }
+
+  if (unitQualifiers.length === 0 && numericValueTypes.has(element.valueType) && looksLikeMeasuredQuantity(element.idShort)) {
+    issues.push(warnIssue(path, "Numerischer Messwert ohne unit-Qualifier.", "units"));
+  }
+}
+
+function validateUnitQualifier(qualifier, path, issues) {
+  if (qualifier.value === undefined || qualifier.value === null || qualifier.value === "") {
+    issues.push(errorIssue(path, "unit-Qualifier braucht einen Wert.", "units"));
+    return;
+  }
+
+  if (qualifier.valueType && qualifier.valueType !== "xs:string") {
+    issues.push(warnIssue(`${path}.valueType`, "unit-Qualifier sollte valueType xs:string nutzen.", "units"));
+  }
+
+  const unit = String(qualifier.value);
+  const trimmedUnit = unit.trim();
+  if (unit !== trimmedUnit) {
+    issues.push(warnIssue(`${path}.value`, "unit enthaelt fuehrende oder folgende Leerzeichen.", "units"));
+  }
+
+  if (!/^[A-Za-z0-9%][A-Za-z0-9%./*^_-]*$/.test(trimmedUnit)) {
+    issues.push(warnIssue(`${path}.value`, `unit "${unit}" nutzt ungewoehnliche Zeichen.`, "units"));
+  } else if (!commonUnitSymbols.has(trimmedUnit)) {
+    issues.push(warnIssue(`${path}.value`, `unit "${unit}" ist nicht in der lokalen Common-Unit-Liste.`, "units"));
+  }
+}
+
+function compareTypedValues(min, max, valueType) {
+  if (min === undefined || min === null || min === "" || max === undefined || max === null || max === "") return null;
+  if (numericValueTypes.has(valueType)) {
+    const left = Number(min);
+    const right = Number(max);
+    return Number.isFinite(left) && Number.isFinite(right) ? left - right : null;
+  }
+  if (valueType === "xs:date" && isValidIsoDate(String(min)) && isValidIsoDate(String(max))) {
+    return Date.parse(`${min}T00:00:00Z`) - Date.parse(`${max}T00:00:00Z`);
+  }
+  if (valueType === "xs:dateTime" && isValidIsoDateTime(String(min)) && isValidIsoDateTime(String(max))) {
+    return Date.parse(min) - Date.parse(max);
+  }
+  if (valueType === "xs:time" && isValidIsoTime(String(min)) && isValidIsoTime(String(max))) {
+    return timeToMillis(String(min)) - timeToMillis(String(max));
+  }
+  return null;
+}
+
+function looksLikeMeasuredQuantity(idShort) {
+  return /temperature|pressure|power|energy|voltage|current|speed|length|height|width|weight|mass|flow|frequency|torque|distance|reach/i.test(
+    String(idShort ?? ""),
+  );
+}
+
+function isValidIsoDate(value) {
+  const match = /^(-?\d{4,})-(\d{2})-(\d{2})(Z|[+-]\d{2}:\d{2})?$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(0, month - 1, day));
+  parsed.setUTCFullYear(year);
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}
+
+function isValidIsoDateTime(value) {
+  return /^-?\d{4,}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/.test(value) && !Number.isNaN(Date.parse(value));
+}
+
+function isValidIsoTime(value) {
+  const match = /^(\d{2}):(\d{2}):(\d{2})(\.\d+)?(Z|[+-]\d{2}:\d{2})?$/.exec(value);
+  if (!match) return false;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3]);
+  return hours <= 23 && minutes <= 59 && seconds <= 59;
+}
+
+function timeToMillis(value) {
+  const [, hours, minutes, seconds] = /^(\d{2}):(\d{2}):(\d{2})/.exec(value) ?? [];
+  return (Number(hours) * 3600 + Number(minutes) * 60 + Number(seconds)) * 1000;
+}
+
+function isValidBase64(value) {
+  return /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value);
 }
 
 function isPlainObject(value) {

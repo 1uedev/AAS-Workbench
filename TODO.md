@@ -4,17 +4,10 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Check semantic IDs more deeply.
-
-## Validator Enhancements
-
-- [ ] Check references more deeply.
-- [ ] Check data types more deeply.
-- [ ] Check units more deeply.
+- [ ] Add reusable Submodel templates.
 
 ## Generator Enhancements
 
-- [ ] Add reusable Submodel templates.
 - [ ] Add richer batch generation controls for mapped tables.
 - [ ] Add template preview before generation.
 

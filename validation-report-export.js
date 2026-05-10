@@ -113,6 +113,7 @@ function countIssuesByCategory(issues) {
       references: 0,
       datatypes: 0,
       semantics: 0,
+      units: 0,
       interoperability: 0,
     },
   );
