@@ -213,6 +213,14 @@
             <button class="secondary-button" type="submit">Mapping-Submodel hinzufügen</button>
           </div>
         </form>
+        <div class="gateway-backend-panel">
+          <div class="form-section-title">OPC UA Backend</div>
+          <div id="gatewayBackendStatus" class="summary-text">Backend-Status wird geladen ...</div>
+          <div class="action-row">
+            <button id="refreshGatewayBackendButton" class="secondary-button" type="button">Backend aktualisieren</button>
+          </div>
+          <div id="opcUaConnectionList" class="gateway-connection-list"></div>
+        </div>
       </section>
 
       <section class="workspace-panel repository-panel" data-panel="repository" aria-labelledby="repository-title">

@@ -4,14 +4,13 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Build backend service for OPC UA connections.
+- [ ] Build backend service for MQTT subscriptions.
 
 ## Live OPC UA / MQTT Gateway Backend
 
-- [ ] Build backend service for OPC UA connections.
 - [ ] Build backend service for MQTT subscriptions.
+- [ ] Persist MQTT mappings and unified gateway status.
 - [ ] Stream live values into the UI.
-- [ ] Persist gateway mappings and status.
 - [ ] Support write-back where safe.
 
 ## AAS Semantic Mapper

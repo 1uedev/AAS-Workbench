@@ -50,6 +50,9 @@ const clearDashboardLayoutButton = document.querySelector("#clearDashboardLayout
 const dashboardStatus = document.querySelector("#dashboardStatus");
 const dashboardGrid = document.querySelector("#dashboardGrid");
 const gatewayForm = document.querySelector("#gatewayForm");
+const gatewayBackendStatus = document.querySelector("#gatewayBackendStatus");
+const refreshGatewayBackendButton = document.querySelector("#refreshGatewayBackendButton");
+const opcUaConnectionList = document.querySelector("#opcUaConnectionList");
 const repositoryForm = document.querySelector("#repositoryForm");
 const repositoryReason = document.querySelector("#repositoryReason");
 const saveRepositoryButton = document.querySelector("#saveRepositoryButton");
@@ -75,6 +78,7 @@ let pendingTableImport = null;
 let gatewayMappingCounter = 1;
 let submodelCounter = 1;
 let propertyCounter = 1;
+let opcUaConnections = [];
 let repositoryAssets = [];
 let explorerNodes = new Map();
 let selectedExplorerNodeId = "package";
@@ -482,6 +486,7 @@ renderTemplatePreview();
 renderGeneratorPreview();
 refreshDashboardCatalog();
 renderDashboard();
+refreshOpcUaConnections();
 updateTreeControls(false);
 
 fileInput.addEventListener("change", async (event) => {
@@ -754,14 +759,35 @@ submodelBuilder.addEventListener("click", (event) => {
   }
 });
 
-gatewayForm.addEventListener("submit", (event) => {
+gatewayForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  let mapping;
   try {
-    const mapping = Object.fromEntries(new FormData(gatewayForm).entries());
+    mapping = Object.fromEntries(new FormData(gatewayForm).entries());
     addGatewayMapping(mapping);
   } catch (error) {
     renderError(error);
+    return;
   }
+
+  if (mapping.protocol !== "OPC UA") {
+    gatewayBackendStatus.textContent = "MQTT-Mapping wurde als AAS-Submodel gespeichert. MQTT-Backend folgt in einem separaten Schritt.";
+    return;
+  }
+
+  try {
+    await registerOpcUaConnection(mapping);
+  } catch (error) {
+    gatewayBackendStatus.textContent = `OPC UA Backend konnte das Mapping nicht speichern: ${error.message}`;
+  }
+});
+
+refreshGatewayBackendButton.addEventListener("click", refreshOpcUaConnections);
+
+opcUaConnectionList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-opcua-action]");
+  if (!button) return;
+  await runOpcUaConnectionAction(button.dataset.opcuaAction, button.dataset.opcuaConnection);
 });
 
 mappingForm.addEventListener("submit", (event) => {
@@ -2112,6 +2138,89 @@ function gatewayProperty(idShort, value, valueType = "xs:string", unit = "") {
   }
 
   return property;
+}
+
+async function registerOpcUaConnection(mapping) {
+  gatewayBackendStatus.textContent = "OPC UA Connection wird gespeichert ...";
+  const response = await fetch("/api/opcua/connections", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      endpoint: mapping.endpoint,
+      nodeId: mapping.sourceAddress,
+      targetProperty: mapping.targetProperty,
+      samplingInterval: mapping.samplingInterval,
+    }),
+  });
+  const connection = await readApiResponse(response);
+  await refreshOpcUaConnections();
+  gatewayBackendStatus.textContent = `OPC UA Connection gespeichert: ${connection.targetProperty || connection.nodeId}.`;
+}
+
+async function refreshOpcUaConnections() {
+  try {
+    const [statusResponse, connectionsResponse] = await Promise.all([
+      fetch("/api/opcua"),
+      fetch("/api/opcua/connections"),
+    ]);
+    const status = await readApiResponse(statusResponse);
+    opcUaConnections = await readApiResponse(connectionsResponse);
+    gatewayBackendStatus.textContent = `${status.status}: ${status.message}`;
+    renderOpcUaConnections();
+  } catch (error) {
+    gatewayBackendStatus.textContent = `OPC UA Backend nicht verfuegbar: ${error.message}`;
+    opcUaConnectionList.innerHTML = "";
+  }
+}
+
+function renderOpcUaConnections() {
+  opcUaConnectionList.innerHTML = opcUaConnections.length
+    ? opcUaConnections.map(renderOpcUaConnectionCard).join("")
+    : `<div class="gateway-connection-card"><h3>Keine OPC UA Connections</h3><div class="gateway-connection-meta">Speichere zuerst ein OPC-UA-Mapping.</div></div>`;
+}
+
+function renderOpcUaConnectionCard(connection) {
+  const status = connection.runtimeStatus || connection.status || "configured";
+  const lastValue = connection.lastValue === undefined ? "nicht gelesen" : connection.lastValue;
+  const lastReadAt = connection.lastReadAt ? formatDateTime(connection.lastReadAt) : "nie";
+  return `
+    <article class="gateway-connection-card">
+      <h3>${escapeHtml(connection.targetProperty || connection.nodeId)}</h3>
+      <div class="gateway-connection-meta">
+        <div>Status: ${escapeHtml(status)}</div>
+        <code>${escapeHtml(connection.endpoint)}</code>
+        <code>${escapeHtml(connection.nodeId)}</code>
+        <div>Sampling: ${escapeHtml(connection.samplingInterval)} ms | Last value: ${escapeHtml(lastValue)} | Read: ${escapeHtml(lastReadAt)}</div>
+        ${connection.lastError ? `<div>Fehler: ${escapeHtml(connection.lastError)}</div>` : ""}
+      </div>
+      <div class="action-row">
+        <button class="secondary-button" type="button" data-opcua-action="connect" data-opcua-connection="${escapeHtml(connection.id)}">Verbinden</button>
+        <button class="secondary-button" type="button" data-opcua-action="read" data-opcua-connection="${escapeHtml(connection.id)}">Wert lesen</button>
+        <button class="secondary-button" type="button" data-opcua-action="disconnect" data-opcua-connection="${escapeHtml(connection.id)}">Trennen</button>
+      </div>
+    </article>
+  `;
+}
+
+async function runOpcUaConnectionAction(action, connectionId) {
+  if (!connectionId) return;
+  const labels = {
+    connect: "Verbindung wird aufgebaut ...",
+    read: "OPC UA Wert wird gelesen ...",
+    disconnect: "Verbindung wird getrennt ...",
+  };
+  gatewayBackendStatus.textContent = labels[action] ?? "OPC UA Aktion wird ausgefuehrt ...";
+
+  try {
+    const response = await fetch(`/api/opcua/connections/${encodeURIComponent(connectionId)}/${action}`, {
+      method: "POST",
+    });
+    const result = await readApiResponse(response);
+    await refreshOpcUaConnections();
+    gatewayBackendStatus.textContent = `${result.status}: ${result.lastError || "OPC UA Aktion abgeschlossen."}`;
+  } catch (error) {
+    gatewayBackendStatus.textContent = `OPC UA Aktion fehlgeschlagen: ${error.message}`;
+  }
 }
 
 function normalizeAasJson(json) {

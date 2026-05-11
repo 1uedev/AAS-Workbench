@@ -6,10 +6,12 @@ const { URL } = require("node:url");
 
 const rootDir = __dirname;
 const dataDir = path.join(rootDir, "data");
+const gatewayPath = path.join(dataDir, "gateway.json");
 const repositoryPath = path.join(dataDir, "repository.json");
 const port = Number(process.env.PORT || 8081);
 const writeRoles = new Set(["editor", "admin"]);
 const repositoryRoles = new Set(["viewer", "editor", "admin"]);
+const opcUaRuntimeConnections = new Map();
 
 const contentTypes = {
   ".aasx": "application/asset-administration-shell-package",
@@ -22,6 +24,7 @@ const contentTypes = {
 };
 
 ensureRepository();
+ensureGatewayStore();
 
 const server = http.createServer(async (request, response) => {
   try {
@@ -46,6 +49,11 @@ async function handleApi(request, response, url) {
 
   if (request.method === "GET" && url.pathname === "/api/health") {
     sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (parts[1] === "opcua") {
+    await handleOpcUaApi(request, response, parts);
     return;
   }
 
@@ -93,6 +101,190 @@ async function handleApi(request, response, url) {
   }
 
   sendJson(response, 404, { error: "API route not found" });
+}
+
+async function handleOpcUaApi(request, response, parts) {
+  if (request.method === "GET" && parts.length === 2) {
+    sendJson(response, 200, getOpcUaServiceStatus());
+    return;
+  }
+
+  if (request.method === "GET" && parts.length === 3 && parts[2] === "connections") {
+    sendJson(response, 200, listOpcUaConnections());
+    return;
+  }
+
+  if (request.method === "POST" && parts.length === 3 && parts[2] === "connections") {
+    sendJson(response, 201, saveOpcUaConnection(await readJsonBody(request)));
+    return;
+  }
+
+  const connectionId = parts[3];
+  if (!connectionId || parts[2] !== "connections") {
+    sendJson(response, 404, { error: "OPC UA route not found" });
+    return;
+  }
+
+  if (request.method === "POST" && parts.length === 5 && parts[4] === "connect") {
+    sendJson(response, 200, await connectOpcUaConnection(connectionId));
+    return;
+  }
+
+  if (request.method === "POST" && parts.length === 5 && parts[4] === "disconnect") {
+    sendJson(response, 200, await disconnectOpcUaConnection(connectionId));
+    return;
+  }
+
+  if (request.method === "POST" && parts.length === 5 && parts[4] === "read") {
+    sendJson(response, 200, await readOpcUaConnection(connectionId));
+    return;
+  }
+
+  sendJson(response, 404, { error: "OPC UA route not found" });
+}
+
+function getOpcUaServiceStatus() {
+  const adapter = loadOpcUaAdapter();
+  return {
+    service: "opcua",
+    status: adapter.available ? "ready" : "adapter_unavailable",
+    adapter: adapter.available ? "node-opcua" : "not installed",
+    connections: listOpcUaConnections().length,
+    message: adapter.available
+      ? "OPC UA backend service is ready."
+      : "Install node-opcua to enable live OPC UA connections. Configuration persistence is available.",
+  };
+}
+
+function listOpcUaConnections() {
+  return readGatewayStore().opcuaConnections.map((connection) => ({
+    ...connection,
+    runtimeStatus: opcUaRuntimeConnections.has(connection.id) ? "connected" : connection.status,
+  }));
+}
+
+function saveOpcUaConnection(body) {
+  const endpoint = String(body.endpoint ?? "").trim();
+  const nodeId = String(body.nodeId ?? body.sourceAddress ?? "").trim();
+  const targetProperty = String(body.targetProperty ?? "").trim();
+  const samplingInterval = Number(body.samplingInterval || 1000);
+
+  if (!endpoint.startsWith("opc.tcp://")) {
+    const error = new Error("OPC UA endpoint must start with opc.tcp://");
+    error.status = 400;
+    throw error;
+  }
+
+  if (!nodeId) {
+    const error = new Error("OPC UA nodeId is required");
+    error.status = 400;
+    throw error;
+  }
+
+  const store = readGatewayStore();
+  const now = new Date().toISOString();
+  const existing = store.opcuaConnections.find(
+    (connection) => connection.endpoint === endpoint && connection.nodeId === nodeId && connection.targetProperty === targetProperty,
+  );
+  const connection = existing ?? {
+    id: crypto.randomUUID(),
+    createdAt: now,
+    status: "configured",
+  };
+
+  Object.assign(connection, {
+    endpoint,
+    nodeId,
+    targetProperty,
+    samplingInterval: Number.isFinite(samplingInterval) ? samplingInterval : 1000,
+    updatedAt: now,
+    lastError: "",
+  });
+
+  if (!existing) store.opcuaConnections.push(connection);
+  writeGatewayStore(store);
+  return connection;
+}
+
+async function connectOpcUaConnection(connectionId) {
+  const connection = findOpcUaConnection(connectionId);
+  const adapter = loadOpcUaAdapter();
+  if (!adapter.available) return updateOpcUaConnectionStatus(connectionId, "adapter_unavailable", adapter.error.message);
+
+  try {
+    const client = adapter.module.OPCUAClient.create({ endpointMustExist: false });
+    await client.connect(connection.endpoint);
+    const session = await client.createSession();
+    opcUaRuntimeConnections.set(connectionId, { client, session, connectedAt: new Date().toISOString() });
+    return updateOpcUaConnectionStatus(connectionId, "connected", "");
+  } catch (error) {
+    return updateOpcUaConnectionStatus(connectionId, "error", error.message);
+  }
+}
+
+async function disconnectOpcUaConnection(connectionId) {
+  const runtime = opcUaRuntimeConnections.get(connectionId);
+  if (runtime) {
+    try {
+      await runtime.session.close();
+      await runtime.client.disconnect();
+    } catch {
+      // Runtime cleanup should not hide the requested disconnected state.
+    }
+    opcUaRuntimeConnections.delete(connectionId);
+  }
+  return updateOpcUaConnectionStatus(connectionId, "disconnected", "");
+}
+
+async function readOpcUaConnection(connectionId) {
+  const connection = findOpcUaConnection(connectionId);
+  const adapter = loadOpcUaAdapter();
+  if (!adapter.available) return updateOpcUaConnectionStatus(connectionId, "adapter_unavailable", adapter.error.message);
+
+  let runtime = opcUaRuntimeConnections.get(connectionId);
+  if (!runtime) {
+    const connected = await connectOpcUaConnection(connectionId);
+    if (connected.status !== "connected") return connected;
+    runtime = opcUaRuntimeConnections.get(connectionId);
+  }
+
+  try {
+    const dataValue = await runtime.session.read({
+      nodeId: connection.nodeId,
+      attributeId: adapter.module.AttributeIds.Value,
+    });
+    const value = dataValue.value?.value;
+    return updateOpcUaConnectionStatus(connectionId, "connected", "", value);
+  } catch (error) {
+    return updateOpcUaConnectionStatus(connectionId, "error", error.message);
+  }
+}
+
+function updateOpcUaConnectionStatus(connectionId, status, errorMessage = "", value) {
+  const store = readGatewayStore();
+  const connection = store.opcuaConnections.find((candidate) => candidate.id === connectionId);
+  if (!connection) throw notFound("OPC UA connection not found");
+  connection.status = status;
+  connection.lastError = errorMessage;
+  connection.lastReadAt = value === undefined ? connection.lastReadAt : new Date().toISOString();
+  connection.lastValue = value === undefined ? connection.lastValue : String(value);
+  connection.updatedAt = new Date().toISOString();
+  writeGatewayStore(store);
+  return connection;
+}
+
+function findOpcUaConnection(connectionId) {
+  const connection = readGatewayStore().opcuaConnections.find((candidate) => candidate.id === connectionId);
+  if (!connection) throw notFound("OPC UA connection not found");
+  return connection;
+}
+
+function loadOpcUaAdapter() {
+  try {
+    return { available: true, module: require("node-opcua") };
+  } catch (error) {
+    return { available: false, error };
+  }
 }
 
 function saveAasVersion(body, role = "editor") {
@@ -248,6 +440,13 @@ function ensureRepository() {
   }
 }
 
+function ensureGatewayStore() {
+  fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(gatewayPath)) {
+    writeGatewayStore({ opcuaConnections: [] });
+  }
+}
+
 function readRepository() {
   ensureRepository();
   return JSON.parse(fs.readFileSync(repositoryPath, "utf8"));
@@ -255,6 +454,18 @@ function readRepository() {
 
 function writeRepository(repository) {
   fs.writeFileSync(repositoryPath, `${JSON.stringify(repository, null, 2)}\n`);
+}
+
+function readGatewayStore() {
+  ensureGatewayStore();
+  const store = JSON.parse(fs.readFileSync(gatewayPath, "utf8"));
+  return {
+    opcuaConnections: Array.isArray(store.opcuaConnections) ? store.opcuaConnections : [],
+  };
+}
+
+function writeGatewayStore(store) {
+  fs.writeFileSync(gatewayPath, `${JSON.stringify(store, null, 2)}\n`);
 }
 
 async function readJsonBody(request) {

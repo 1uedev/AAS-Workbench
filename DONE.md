@@ -95,6 +95,12 @@
   - `aasx/data.json`
 - Added OPC UA / MQTT gateway mapping MVP.
 - Added `GatewayMapping` Submodel generation for exportable gateway configuration.
+- Added OPC UA backend service:
+  - Local connection persistence in `data/gateway.json`
+  - Service status and connection list API
+  - Connection register, connect, read and disconnect API
+  - Gateway UI status panel with per-connection actions
+  - Graceful `node-opcua` adapter-unavailable state when the optional dependency is not installed
 - Added local backend with static file serving and AAS Repository API.
 - Added file-backed repository persistence in `data/repository.json`.
 - Added version history for saved AAS payloads.
@@ -153,6 +159,8 @@
   - Generator templates, template preview, live generator preview and valid generated AAS output
   - Batch generation options for single-AAS grouping, duplicate replacement and empty-value skipping
   - Gateway mapping
+  - OPC UA backend status, connection persistence and adapter-unavailable UI path
+  - OPC UA connection register/list/connect/read API smoke test
   - JSON/AASX export button states
   - AASX export click without console errors
   - Explorer tree expansion, node selection and JSON inspector updates

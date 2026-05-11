@@ -670,6 +670,49 @@ body[data-route="dashboard"] .app-shell {
   background: #fff;
 }
 
+.gateway-backend-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.gateway-connection-list {
+  display: grid;
+  gap: 10px;
+}
+
+.gateway-connection-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e8ede8;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.gateway-connection-card h3 {
+  margin: 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.gateway-connection-meta {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.gateway-connection-meta code {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
 .repository-list {
   display: grid;
   gap: 12px;
