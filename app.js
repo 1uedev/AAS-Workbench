@@ -51,6 +51,8 @@ const dashboardStatus = document.querySelector("#dashboardStatus");
 const dashboardGrid = document.querySelector("#dashboardGrid");
 const gatewayForm = document.querySelector("#gatewayForm");
 const gatewayUnifiedStatus = document.querySelector("#gatewayUnifiedStatus");
+const gatewayLiveStreamStatus = document.querySelector("#gatewayLiveStreamStatus");
+const gatewayLiveValues = document.querySelector("#gatewayLiveValues");
 const gatewayBackendStatus = document.querySelector("#gatewayBackendStatus");
 const refreshGatewayBackendButton = document.querySelector("#refreshGatewayBackendButton");
 const opcUaConnectionList = document.querySelector("#opcUaConnectionList");
@@ -82,6 +84,7 @@ let gatewayMappingCounter = 1;
 let submodelCounter = 1;
 let propertyCounter = 1;
 let gatewayStatus = null;
+let gatewayEventSource = null;
 let opcUaConnections = [];
 let mqttSubscriptions = [];
 let repositoryAssets = [];
@@ -492,6 +495,7 @@ renderGeneratorPreview();
 refreshDashboardCatalog();
 renderDashboard();
 refreshGatewayBackends();
+startGatewayLiveStream();
 updateTreeControls(false);
 
 fileInput.addEventListener("change", async (event) => {
@@ -654,6 +658,10 @@ copyJsonButton.addEventListener("click", async () => {
   window.setTimeout(() => {
     copyJsonButton.textContent = originalText;
   }, 1200);
+});
+
+window.addEventListener("beforeunload", () => {
+  gatewayEventSource?.close();
 });
 
 repositoryForm.addEventListener("submit", async (event) => {
@@ -2194,6 +2202,7 @@ async function refreshGatewayStatus() {
     const response = await fetch("/api/gateway");
     gatewayStatus = await readApiResponse(response);
     renderGatewayStatus();
+    renderGatewayLiveValues();
   } catch (error) {
     gatewayUnifiedStatus.innerHTML = `
       <div class="gateway-status-heading">
@@ -2222,6 +2231,51 @@ function renderGatewayStatus() {
       <div>OPC UA: ${escapeHtml(protocols.opcua?.mappings ?? 0)} Mappings | Adapter: ${escapeHtml(protocols.opcua?.adapter ?? "unbekannt")}</div>
       <div>MQTT: ${escapeHtml(protocols.mqtt?.mappings ?? 0)} Mappings | Adapter: ${escapeHtml(protocols.mqtt?.adapter ?? "unbekannt")}</div>
     </div>
+  `;
+}
+
+function startGatewayLiveStream() {
+  if (!("EventSource" in window)) {
+    gatewayLiveStreamStatus.textContent = "Live-Stream wird von diesem Browser nicht unterstuetzt.";
+    renderGatewayLiveValues();
+    return;
+  }
+
+  if (gatewayEventSource) gatewayEventSource.close();
+  gatewayEventSource = new EventSource("/api/gateway/stream");
+
+  gatewayEventSource.addEventListener("open", () => {
+    gatewayLiveStreamStatus.textContent = "Live-Stream aktiv.";
+  });
+
+  gatewayEventSource.addEventListener("gateway", (event) => {
+    gatewayStatus = JSON.parse(event.data);
+    renderGatewayStatus();
+    renderGatewayLiveValues();
+    gatewayLiveStreamStatus.textContent = `Live-Stream aktiv | ${formatDateTime(gatewayStatus.updatedAt)}`;
+  });
+
+  gatewayEventSource.addEventListener("error", () => {
+    gatewayLiveStreamStatus.textContent = "Live-Stream versucht neu zu verbinden ...";
+  });
+}
+
+function renderGatewayLiveValues() {
+  const recentValues = gatewayStatus?.recentValues ?? [];
+  gatewayLiveValues.innerHTML = recentValues.length
+    ? recentValues.map(renderGatewayLiveValue).join("")
+    : `<div class="gateway-live-empty">Noch keine Live-Werte empfangen.</div>`;
+}
+
+function renderGatewayLiveValue(entry) {
+  const receivedAt = entry.receivedAt ? formatDateTime(entry.receivedAt) : "unbekannt";
+  return `
+    <article class="gateway-live-value">
+      <strong>${escapeHtml(entry.label || entry.source || entry.protocol)}</strong>
+      <span>${escapeHtml(entry.protocol)} | ${escapeHtml(receivedAt)}</span>
+      <code>${escapeHtml(entry.value)}</code>
+      <span>${escapeHtml(entry.source)}</span>
+    </article>
   `;
 }
 

@@ -4,11 +4,10 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Stream live values into the UI.
+- [ ] Support write-back where safe.
 
 ## Live OPC UA / MQTT Gateway Backend
 
-- [ ] Stream live values into the UI.
 - [ ] Support write-back where safe.
 
 ## AAS Semantic Mapper

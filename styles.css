@@ -735,6 +735,44 @@ body[data-route="dashboard"] .app-shell {
   font-size: 13px;
 }
 
+.gateway-live-stream-status {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.gateway-live-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.gateway-live-value,
+.gateway-live-empty {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #e8ede8;
+  border-radius: 8px;
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+
+.gateway-live-value strong {
+  font-size: 15px;
+}
+
+.gateway-live-value span,
+.gateway-live-empty {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.gateway-live-value code {
+  color: var(--ink);
+  font-size: 13px;
+}
+
 .gateway-backend-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));

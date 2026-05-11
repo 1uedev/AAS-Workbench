@@ -13,6 +13,7 @@ const writeRoles = new Set(["editor", "admin"]);
 const repositoryRoles = new Set(["viewer", "editor", "admin"]);
 const opcUaRuntimeConnections = new Map();
 const mqttRuntimeSubscriptions = new Map();
+const gatewayStreamClients = new Set();
 
 const contentTypes = {
   ".aasx": "application/asset-administration-shell-package",
@@ -115,12 +116,54 @@ async function handleApi(request, response, url) {
 }
 
 function handleGatewayApi(request, response, parts) {
+  if (request.method === "GET" && parts.length === 3 && parts[2] === "stream") {
+    startGatewayStream(request, response);
+    return;
+  }
+
   if (request.method === "GET" && parts.length === 2) {
     sendJson(response, 200, getGatewayServiceStatus());
     return;
   }
 
   sendJson(response, 404, { error: "Gateway route not found" });
+}
+
+function startGatewayStream(request, response) {
+  response.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  response.write("retry: 2000\n\n");
+  gatewayStreamClients.add(response);
+  sendGatewayStreamSnapshot(response);
+
+  const heartbeat = setInterval(() => {
+    sendGatewayStreamSnapshot(response);
+  }, 2500);
+
+  request.on("close", () => {
+    clearInterval(heartbeat);
+    gatewayStreamClients.delete(response);
+  });
+}
+
+function sendGatewayStreamSnapshot(response) {
+  if (response.destroyed) return;
+  try {
+    response.write("event: gateway\n");
+    response.write(`data: ${JSON.stringify(getGatewayServiceStatus())}\n\n`);
+  } catch {
+    gatewayStreamClients.delete(response);
+  }
+}
+
+function broadcastGatewaySnapshot() {
+  for (const client of gatewayStreamClients) {
+    sendGatewayStreamSnapshot(client);
+  }
 }
 
 function getGatewayServiceStatus() {
@@ -348,6 +391,7 @@ function saveOpcUaConnection(body) {
 
   if (!existing) store.opcuaConnections.push(connection);
   writeGatewayStore(store);
+  broadcastGatewaySnapshot();
   return connection;
 }
 
@@ -415,6 +459,7 @@ function updateOpcUaConnectionStatus(connectionId, status, errorMessage = "", va
   connection.lastValue = value === undefined ? connection.lastValue : String(value);
   connection.updatedAt = new Date().toISOString();
   writeGatewayStore(store);
+  broadcastGatewaySnapshot();
   return connection;
 }
 
@@ -530,6 +575,7 @@ function saveMqttSubscription(body) {
 
   if (!existing) store.mqttSubscriptions.push(subscription);
   writeGatewayStore(store);
+  broadcastGatewaySnapshot();
   return subscription;
 }
 
@@ -658,6 +704,7 @@ function updateMqttSubscriptionStatus(subscriptionId, status, errorMessage = "",
   subscription.lastTopic = topic === undefined ? subscription.lastTopic : String(topic);
   subscription.updatedAt = new Date().toISOString();
   writeGatewayStore(store);
+  broadcastGatewaySnapshot();
   return subscription;
 }
 
