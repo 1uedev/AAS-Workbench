@@ -38,14 +38,27 @@ const submodelTemplateSelect = document.querySelector("#submodelTemplateSelect")
 const addTemplateButton = document.querySelector("#addTemplateButton");
 const templatePreview = document.querySelector("#templatePreview");
 const generatorPreview = document.querySelector("#generatorPreview");
+const dashboardElementSelect = document.querySelector("#dashboardElementSelect");
+const dashboardWidgetType = document.querySelector("#dashboardWidgetType");
+const dashboardLiveToggle = document.querySelector("#dashboardLiveToggle");
+const addDashboardWidgetButton = document.querySelector("#addDashboardWidgetButton");
+const refreshDashboardButton = document.querySelector("#refreshDashboardButton");
+const saveDashboardLayoutButton = document.querySelector("#saveDashboardLayoutButton");
+const loadDashboardLayoutButton = document.querySelector("#loadDashboardLayoutButton");
+const clearDashboardLayoutButton = document.querySelector("#clearDashboardLayoutButton");
+const dashboardStatus = document.querySelector("#dashboardStatus");
+const dashboardGrid = document.querySelector("#dashboardGrid");
 const gatewayForm = document.querySelector("#gatewayForm");
 const repositoryForm = document.querySelector("#repositoryForm");
 const repositoryReason = document.querySelector("#repositoryReason");
 const saveRepositoryButton = document.querySelector("#saveRepositoryButton");
 const refreshRepositoryButton = document.querySelector("#refreshRepositoryButton");
 const repositorySearchForm = document.querySelector("#repositorySearchForm");
+const repositoryRoleSelect = document.querySelector("#repositoryRoleSelect");
+const repositoryAccessSummary = document.querySelector("#repositoryAccessSummary");
 const repositoryStatus = document.querySelector("#repositoryStatus");
 const repositoryList = document.querySelector("#repositoryList");
+const repositoryEvents = document.querySelector("#repositoryEvents");
 const repositoryAssetSearch = document.querySelector("#repositoryAssetSearch");
 const repositoryManufacturerSearch = document.querySelector("#repositoryManufacturerSearch");
 const repositorySemanticSearch = document.querySelector("#repositorySemanticSearch");
@@ -66,6 +79,18 @@ let explorerNodes = new Map();
 let selectedExplorerNodeId = "package";
 let expandedExplorerNodeIds = new Set(["package"]);
 let lastExplorerQuery = "";
+let selectedRepositoryEventAssetId = "";
+let dashboardElementCatalog = [];
+let dashboardWidgets = [];
+let dashboardLiveTimer = null;
+
+const dashboardLayoutStorageKey = "aasWorkbenchDashboardLayout";
+
+const repositoryRoleDescriptions = {
+  viewer: "Viewer darf Repository-Eintraege laden, vergleichen und Traceability Events ansehen. Speichern ist gesperrt.",
+  editor: "Editor darf Repository-Eintraege laden, vergleichen, Events ansehen und neue Versionen speichern.",
+  admin: "Admin hat vollen Repository-Zugriff fuer diese lokale Workbench.",
+};
 
 const targetColumns = [
   { key: "assetId", label: "Asset ID", required: true, aliases: ["assetid", "asset id", "globalassetid", "global asset id"] },
@@ -438,6 +463,7 @@ const submodelTemplates = [
 
 window.addEventListener("hashchange", applyRoute);
 applyRoute();
+initializeRepositoryAccess();
 renderTemplateOptions();
 addSubmodelEditor({
   idShort: "TechnicalData",
@@ -453,6 +479,8 @@ addSubmodelEditor({
 });
 renderTemplatePreview();
 renderGeneratorPreview();
+refreshDashboardCatalog();
+renderDashboard();
 updateTreeControls(false);
 
 fileInput.addEventListener("change", async (event) => {
@@ -629,10 +657,36 @@ repositorySearchForm.addEventListener("reset", () => window.setTimeout(renderFil
 clearRepositorySearchButton.addEventListener("click", clearRepositorySearch);
 clearRepositorySearchButton.addEventListener("pointerdown", clearRepositorySearch);
 
+repositoryRoleSelect.addEventListener("change", () => {
+  localStorage.setItem("aasWorkbenchRepositoryRole", getRepositoryRole());
+  updateRepositoryAccessState();
+});
+
+dashboardElementSelect.addEventListener("change", updateDashboardWidgetTypeState);
+dashboardWidgetType.addEventListener("change", updateDashboardWidgetTypeState);
+addDashboardWidgetButton.addEventListener("click", addDashboardWidgetFromSelection);
+refreshDashboardButton.addEventListener("click", () => refreshDashboardValues("Dashboard-Werte aktualisiert."));
+saveDashboardLayoutButton.addEventListener("click", saveDashboardLayout);
+loadDashboardLayoutButton.addEventListener("click", loadDashboardLayout);
+clearDashboardLayoutButton.addEventListener("click", clearDashboardLayout);
+dashboardLiveToggle.addEventListener("change", updateDashboardLiveRefresh);
+dashboardGrid.addEventListener("click", (event) => {
+  const removeButton = event.target.closest("[data-dashboard-remove]");
+  if (!removeButton) return;
+  dashboardWidgets = dashboardWidgets.filter((widget) => widget.id !== removeButton.dataset.dashboardRemove);
+  renderDashboard("Widget entfernt.");
+});
+
 repositoryList.addEventListener("click", async (event) => {
   const loadVersionButton = event.target.closest("[data-action='load-version']");
   if (loadVersionButton) {
     await loadRepositoryVersion(loadVersionButton.dataset.assetId, loadVersionButton.dataset.version);
+    return;
+  }
+
+  const eventsButton = event.target.closest("[data-action='view-events']");
+  if (eventsButton) {
+    await loadRepositoryEvents(eventsButton.dataset.assetId);
     return;
   }
 
@@ -745,7 +799,7 @@ function applyRoute() {
 
 function getRoute() {
   const route = window.location.hash.replace("#", "") || "home";
-  return ["home", "import", "generator", "gateway", "repository", "explorer"].includes(route) ? route : "home";
+  return ["home", "import", "generator", "gateway", "repository", "dashboard", "explorer"].includes(route) ? route : "home";
 }
 
 function navigateTo(route) {
@@ -979,6 +1033,303 @@ function buildPackageFromGenerator() {
   return recordsToAasPackage(records);
 }
 
+function refreshDashboardCatalog() {
+  dashboardElementCatalog = currentPackage ? buildDashboardElementCatalog(currentPackage) : [];
+  const selectedKey = dashboardElementSelect.value;
+  dashboardElementSelect.innerHTML = dashboardElementCatalog.length
+    ? dashboardElementCatalog
+        .map((entry) => `<option value="${escapeHtml(entry.key)}">${escapeHtml(entry.path)}</option>`)
+        .join("")
+    : `<option value="">Keine AAS geladen</option>`;
+
+  if (dashboardElementCatalog.some((entry) => entry.key === selectedKey)) {
+    dashboardElementSelect.value = selectedKey;
+  }
+
+  updateDashboardWidgetTypeState();
+}
+
+function buildDashboardElementCatalog(aasPackage) {
+  const catalog = [];
+  (aasPackage.submodels ?? []).forEach((submodel, submodelIndex) => {
+    const submodelLabel = submodel.idShort || submodel.id || `Submodel ${submodelIndex + 1}`;
+    (submodel.submodelElements ?? []).forEach((element, elementIndex) => {
+      addDashboardElementEntry(catalog, submodel, submodelIndex, element, [elementIndex], [element.idShort || `Element${elementIndex + 1}`], submodelLabel);
+    });
+  });
+  return catalog;
+}
+
+function addDashboardElementEntry(catalog, submodel, submodelIndex, element, indexPath, labelPath, submodelLabel) {
+  const label = labelPath.at(-1) || `Element${indexPath.at(-1) + 1}`;
+  const path = `${submodelLabel} / ${labelPath.join(" / ")}`;
+  const value = getDashboardElementValue(element);
+  const numericValue = Number(value);
+  const isNumeric = numericValueTypes.has(element.valueType) && Number.isFinite(numericValue);
+  const key = `${submodel.id || `submodel:${submodelIndex}`}:${indexPath.join(".")}:${labelPath.join("/")}`;
+
+  catalog.push({
+    key,
+    label,
+    path,
+    submodelId: submodel.id ?? "",
+    value,
+    valueType: element.valueType ?? element.modelType ?? "Element",
+    unit: getElementUnit(element),
+    semanticId: getReferenceValues(element.semanticId).join(", "),
+    numeric: isNumeric,
+    numericValue: isNumeric ? numericValue : null,
+  });
+
+  getElementChildren(element).forEach((child, childIndex) => {
+    const childLabel = child.idShort || `Element${childIndex + 1}`;
+    addDashboardElementEntry(
+      catalog,
+      submodel,
+      submodelIndex,
+      child,
+      [...indexPath, childIndex],
+      [...labelPath, childLabel],
+      submodelLabel,
+    );
+  });
+}
+
+function getDashboardElementValue(element) {
+  if (element?.value !== undefined && element?.value !== null && typeof element.value !== "object") {
+    return String(element.value);
+  }
+  const children = getElementChildren(element);
+  if (children.length) return `${children.length} Children`;
+  return "";
+}
+
+function getElementUnit(element) {
+  return element?.qualifiers?.find((qualifier) => qualifier.type === "unit")?.value ?? "";
+}
+
+function updateDashboardWidgetTypeState() {
+  const hasElements = dashboardElementCatalog.length > 0;
+  const selected = getSelectedDashboardElement();
+  const chartOption = dashboardWidgetType.querySelector("option[value='chart']");
+  if (chartOption) chartOption.disabled = !selected?.numeric;
+  if (dashboardWidgetType.value === "chart" && !selected?.numeric) dashboardWidgetType.value = "card";
+
+  dashboardElementSelect.disabled = !hasElements;
+  dashboardWidgetType.disabled = !hasElements;
+  addDashboardWidgetButton.disabled = !hasElements || (dashboardWidgetType.value === "chart" && !selected?.numeric);
+  refreshDashboardButton.disabled = !currentPackage || dashboardWidgets.length === 0;
+  saveDashboardLayoutButton.disabled = dashboardWidgets.length === 0;
+  clearDashboardLayoutButton.disabled = dashboardWidgets.length === 0;
+  dashboardLiveToggle.disabled = !currentPackage;
+}
+
+function getSelectedDashboardElement() {
+  return dashboardElementCatalog.find((entry) => entry.key === dashboardElementSelect.value) ?? dashboardElementCatalog[0];
+}
+
+function addDashboardWidgetFromSelection() {
+  const entry = getSelectedDashboardElement();
+  if (!entry) {
+    renderDashboard("Lade eine AAS, um Dashboard Widgets zu erstellen.");
+    return;
+  }
+
+  const widgetType = dashboardWidgetType.value;
+  if (widgetType === "chart" && !entry.numeric) {
+    renderDashboard("Charts brauchen einen numerischen Wert.");
+    return;
+  }
+
+  const duplicate = dashboardWidgets.some((widget) => widget.elementKey === entry.key && widget.widgetType === widgetType);
+  if (duplicate) {
+    renderDashboard("Dieses Widget ist bereits im Dashboard.");
+    return;
+  }
+
+  const widget = hydrateDashboardWidget(
+    {
+      id: createDashboardWidgetId(),
+      elementKey: entry.key,
+      widgetType,
+      samples: [],
+    },
+    entry,
+    true,
+  );
+  dashboardWidgets.push(widget);
+  renderDashboard("Widget hinzugefuegt.");
+}
+
+function createDashboardWidgetId() {
+  return crypto?.randomUUID ? crypto.randomUUID() : `dashboard-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function refreshDashboardValues(message = "") {
+  if (currentPackage) refreshDashboardCatalog();
+  dashboardWidgets = dashboardWidgets
+    .map((widget) => {
+      const entry = dashboardElementCatalog.find((candidate) => candidate.key === widget.elementKey);
+      return entry ? hydrateDashboardWidget(widget, entry, true) : { ...widget, missing: true };
+    })
+    .filter(Boolean);
+  renderDashboard(message);
+}
+
+function hydrateDashboardWidget(widget, entry, recordSample = false) {
+  const samples = [...(widget.samples ?? [])];
+  if (recordSample && entry.numeric) {
+    samples.push(entry.numericValue);
+    if (samples.length > 12) samples.shift();
+  }
+
+  return {
+    ...widget,
+    label: entry.label,
+    path: entry.path,
+    value: entry.value,
+    valueType: entry.valueType,
+    unit: entry.unit,
+    semanticId: entry.semanticId,
+    numeric: entry.numeric,
+    numericValue: entry.numericValue,
+    samples,
+    updatedAt: new Date().toISOString(),
+    missing: false,
+  };
+}
+
+function renderDashboard(message = "") {
+  updateDashboardWidgetTypeState();
+  if (!currentPackage) {
+    dashboardStatus.textContent = message || "Lade eine AAS, um Dashboard Widgets zu erstellen.";
+  } else if (message) {
+    dashboardStatus.textContent = message;
+  } else {
+    const liveLabel = dashboardLiveToggle.checked ? " | Live refresh aktiv" : "";
+    dashboardStatus.textContent = `${dashboardWidgets.length} Widgets | ${dashboardElementCatalog.length} Elements verfuegbar${liveLabel}.`;
+  }
+
+  if (dashboardWidgets.length === 0) {
+    dashboardGrid.className = "dashboard-empty";
+    dashboardGrid.textContent = currentPackage ? "Noch keine Widgets." : "Keine AAS geladen.";
+    return;
+  }
+
+  dashboardGrid.className = "dashboard-grid";
+  dashboardGrid.innerHTML = dashboardWidgets.map(renderDashboardWidget).join("");
+}
+
+function renderDashboardWidget(widget) {
+  const isChart = widget.widgetType === "chart";
+  const value = widget.missing ? "nicht gefunden" : formatValue(widget.value);
+  const unit = widget.unit ? `<span>${escapeHtml(widget.unit)}</span>` : "";
+  return `
+    <article class="dashboard-widget">
+      <div class="dashboard-widget-header">
+        <div>
+          <div class="dashboard-widget-type">${isChart ? "Chart" : "Card"}</div>
+          <h3>${escapeHtml(widget.label ?? "Element")}</h3>
+        </div>
+        <button class="secondary-button" type="button" data-dashboard-remove="${escapeHtml(widget.id)}">Entfernen</button>
+      </div>
+      <div class="dashboard-value">${escapeHtml(value)}${unit}</div>
+      ${isChart ? renderDashboardChart(widget) : ""}
+      <div class="dashboard-meta">
+        <div>${escapeHtml(widget.valueType ?? "")}</div>
+        <code>${escapeHtml(widget.path ?? widget.elementKey)}</code>
+        ${widget.semanticId ? `<code>${escapeHtml(widget.semanticId)}</code>` : ""}
+        <div>Live: ${escapeHtml(formatDateTime(widget.updatedAt))}</div>
+      </div>
+    </article>
+  `;
+}
+
+function renderDashboardChart(widget) {
+  if (!widget.numeric || !widget.samples?.length) {
+    return `<div class="dashboard-chart">Keine numerischen Samples.</div>`;
+  }
+
+  const min = Math.min(...widget.samples);
+  const max = Math.max(...widget.samples);
+  const range = max - min;
+  const bars = widget.samples.map((sample) => {
+    const height = range === 0 ? 54 : 12 + ((sample - min) / range) * 88;
+    return `<div class="dashboard-chart-bar" style="height:${height.toFixed(1)}%" title="${escapeHtml(sample)}"></div>`;
+  });
+  return `<div class="dashboard-chart" aria-label="Numeric history">${bars.join("")}</div>`;
+}
+
+function saveDashboardLayout() {
+  const layout = {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    widgets: dashboardWidgets.map((widget) => ({
+      elementKey: widget.elementKey,
+      widgetType: widget.widgetType,
+    })),
+  };
+  localStorage.setItem(dashboardLayoutStorageKey, JSON.stringify(layout));
+  renderDashboard("Dashboard Layout gespeichert.");
+}
+
+function loadDashboardLayout() {
+  if (!currentPackage) {
+    renderDashboard("Lade zuerst eine AAS.");
+    return;
+  }
+
+  const rawLayout = localStorage.getItem(dashboardLayoutStorageKey);
+  if (!rawLayout) {
+    renderDashboard("Kein gespeichertes Layout vorhanden.");
+    return;
+  }
+
+  try {
+    const layout = JSON.parse(rawLayout);
+    const loadedWidgets = (layout.widgets ?? [])
+      .map((savedWidget) => {
+        const entry = dashboardElementCatalog.find((candidate) => candidate.key === savedWidget.elementKey);
+        if (!entry) return null;
+        return hydrateDashboardWidget(
+          {
+            id: createDashboardWidgetId(),
+            elementKey: savedWidget.elementKey,
+            widgetType: savedWidget.widgetType === "chart" && entry.numeric ? "chart" : "card",
+            samples: [],
+          },
+          entry,
+          true,
+        );
+      })
+      .filter(Boolean);
+
+    dashboardWidgets = loadedWidgets;
+    renderDashboard(`${loadedWidgets.length} Widgets aus Layout geladen.`);
+  } catch (error) {
+    renderDashboard(`Layout konnte nicht geladen werden: ${error.message}`);
+  }
+}
+
+function clearDashboardLayout() {
+  dashboardWidgets = [];
+  renderDashboard("Dashboard Layout geleert.");
+}
+
+function updateDashboardLiveRefresh() {
+  if (dashboardLiveTimer) {
+    window.clearInterval(dashboardLiveTimer);
+    dashboardLiveTimer = null;
+  }
+
+  if (dashboardLiveToggle.checked && currentPackage) {
+    dashboardLiveTimer = window.setInterval(() => {
+      refreshDashboardValues("Live-Werte aktualisiert.");
+    }, 3000);
+  }
+  renderDashboard();
+}
+
 function loadPackage(aasPackage) {
   currentPackage = aasPackage;
   resetExplorerState();
@@ -986,12 +1337,14 @@ function loadPackage(aasPackage) {
   currentValidationReport = report;
   renderValidation(report);
   renderExplorer(aasPackage, searchInput.value);
+  refreshDashboardCatalog();
+  refreshDashboardValues();
   downloadButton.disabled = false;
   downloadAasxButton.disabled = false;
   downloadPdfButton.disabled = false;
   downloadExcelButton.disabled = false;
   downloadValidationReportButton.disabled = false;
-  saveRepositoryButton.disabled = false;
+  updateRepositoryAccessState();
 }
 
 function resetExplorerState() {
@@ -1003,11 +1356,15 @@ function resetExplorerState() {
 
 async function saveCurrentPackageToRepository() {
   if (!currentPackage) return;
+  if (!canWriteRepository()) {
+    repositoryStatus.textContent = "Aktuelle Rolle darf keine AAS-Versionen speichern.";
+    return;
+  }
 
   try {
     const response = await fetch("/api/aas", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: repositoryHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         payload: currentPackage,
         changeReason: repositoryReason.value.trim() || "Saved from Workbench",
@@ -1023,12 +1380,44 @@ async function saveCurrentPackageToRepository() {
   }
 }
 
+function initializeRepositoryAccess() {
+  const storedRole = localStorage.getItem("aasWorkbenchRepositoryRole");
+  if (["viewer", "editor", "admin"].includes(storedRole)) {
+    repositoryRoleSelect.value = storedRole;
+  }
+  updateRepositoryAccessState();
+}
+
+function getRepositoryRole() {
+  return repositoryRoleSelect.value || "editor";
+}
+
+function canWriteRepository() {
+  return ["editor", "admin"].includes(getRepositoryRole());
+}
+
+function repositoryHeaders(headers = {}) {
+  return {
+    ...headers,
+    "X-Workbench-Role": getRepositoryRole(),
+  };
+}
+
+function updateRepositoryAccessState() {
+  const role = getRepositoryRole();
+  repositoryAccessSummary.textContent = repositoryRoleDescriptions[role] ?? repositoryRoleDescriptions.viewer;
+  saveRepositoryButton.disabled = !currentPackage || !canWriteRepository();
+}
+
 async function refreshRepository() {
   try {
     repositoryStatus.textContent = "Repository wird geladen ...";
-    const response = await fetch("/api/aas");
+    const response = await fetch("/api/aas", { headers: repositoryHeaders() });
     repositoryAssets = await enrichRepositoryAssets(await readApiResponse(response));
     renderFilteredRepositoryList();
+    if (selectedRepositoryEventAssetId && repositoryAssets.some((asset) => asset.id === selectedRepositoryEventAssetId)) {
+      await loadRepositoryEvents(selectedRepositoryEventAssetId, { silent: true });
+    }
   } catch (error) {
     repositoryStatus.textContent = `Repository nicht verfuegbar: ${error.message}`;
     repositoryList.innerHTML = "";
@@ -1205,7 +1594,9 @@ function sortSearchValues(values) {
 
 async function loadRepositoryVersion(assetId, version) {
   try {
-    const response = await fetch(`/api/aas/${encodeURIComponent(assetId)}/versions/${encodeURIComponent(version)}`);
+    const response = await fetch(`/api/aas/${encodeURIComponent(assetId)}/versions/${encodeURIComponent(version)}`, {
+      headers: repositoryHeaders(),
+    });
     const result = await readApiResponse(response);
     currentFileName = toIdShort(result.asset.idShort || "repository-aas").toLowerCase();
     loadPackage(normalizeAasJson(result.payload));
@@ -1240,8 +1631,56 @@ async function compareRepositoryVersions(assetId, baseVersion, targetVersion) {
 }
 
 async function fetchRepositoryVersion(assetId, version) {
-  const response = await fetch(`/api/aas/${encodeURIComponent(assetId)}/versions/${encodeURIComponent(version)}`);
+  const response = await fetch(`/api/aas/${encodeURIComponent(assetId)}/versions/${encodeURIComponent(version)}`, {
+    headers: repositoryHeaders(),
+  });
   return readApiResponse(response);
+}
+
+async function loadRepositoryEvents(assetId, options = {}) {
+  try {
+    selectedRepositoryEventAssetId = assetId;
+    if (!options.silent) {
+      repositoryEvents.className = "repository-events-empty";
+      repositoryEvents.textContent = "Traceability Events werden geladen ...";
+    }
+    const response = await fetch(`/api/aas/${encodeURIComponent(assetId)}/events`, {
+      headers: repositoryHeaders(),
+    });
+    const events = await readApiResponse(response);
+    const asset = repositoryAssets.find((candidate) => candidate.id === assetId);
+    renderRepositoryEvents(asset, events);
+  } catch (error) {
+    repositoryEvents.className = "repository-events-empty";
+    repositoryEvents.textContent = `Traceability Events konnten nicht geladen werden: ${error.message}`;
+  }
+}
+
+function renderRepositoryEvents(asset, events) {
+  const sortedEvents = [...events].sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt));
+  repositoryEvents.className = sortedEvents.length ? "repository-events" : "repository-events-empty";
+  repositoryEvents.innerHTML = sortedEvents.length
+    ? `
+      <h3>Traceability Events: ${escapeHtml(asset?.idShort ?? "AAS")}</h3>
+      <div class="event-list">
+        ${sortedEvents.map(renderRepositoryEvent).join("")}
+      </div>
+    `
+    : "Keine Traceability Events gespeichert.";
+}
+
+function renderRepositoryEvent(event) {
+  const metadata = event.metadata ?? {};
+  return `
+    <article class="event-card">
+      <strong>${escapeHtml(event.eventType ?? "event")} | v${escapeHtml(event.version ?? "")}</strong>
+      <div class="repository-meta">${escapeHtml(formatDateTime(event.createdAt))} | ${escapeHtml(metadata.createdBy ?? "unbekannt")}</div>
+      <div>${escapeHtml(event.message ?? "")}</div>
+      <code>${escapeHtml(metadata.globalAssetId ?? "")}</code>
+      <code>${escapeHtml(metadata.shellId ?? "")}</code>
+      ${metadata.role ? `<div class="repository-meta">Role: ${escapeHtml(metadata.role)}</div>` : ""}
+    </article>
+  `;
 }
 
 async function readApiResponse(response) {
@@ -1294,6 +1733,7 @@ function renderRepositoryCard(asset) {
               `<button class="secondary-button" type="button" data-action="load-version" data-asset-id="${escapeHtml(asset.id)}" data-version="${version}">v${version}</button>`,
           )
           .join("")}
+        <button class="secondary-button" type="button" data-action="view-events" data-asset-id="${escapeHtml(asset.id)}">Events</button>
       </div>
       ${compareControls}
     </article>
@@ -3633,6 +4073,13 @@ function renderError(error) {
   issuesList.innerHTML = "";
   resetExplorerState();
   updateTreeControls(false);
+  dashboardLiveToggle.checked = false;
+  if (dashboardLiveTimer) {
+    window.clearInterval(dashboardLiveTimer);
+    dashboardLiveTimer = null;
+  }
+  refreshDashboardCatalog();
+  renderDashboard("Lade eine AAS, um Dashboard Widgets zu erstellen.");
   explorer.className = "explorer-empty";
   explorer.textContent = "Die Datei konnte nicht geladen werden.";
   renderJsonInspector();

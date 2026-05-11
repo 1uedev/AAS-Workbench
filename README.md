@@ -4,14 +4,15 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 
 ## Funktionen
 
-- Hauptseite mit Unterseiten fuer Import, Generator, Gateway und Explorer
+- Hauptseite mit Unterseiten fuer Import, Generator, Gateway, Repository, Dashboard und Explorer
 - AASX und AAS-JSON per Dateiauswahl oder Drag-and-Drop laden und prüfen
 - AAS manuell ueber einen Multi-Submodel-/Multi-Property-Generator mit Submodel-Templates und Vorschau erzeugen
 - CSV- und Excel-Dateien (`.xlsx`) mit Mapping-Dialog und Batch-Optionen in eine einfache AAS-Struktur umwandeln
 - OPC-UA- und MQTT-Quellen als Gateway-Mapping-Submodel dokumentieren
-- AAS versioniert in einem lokalen Repository speichern, laden und nach Asset, Manufacturer, Semantic ID oder Submodel durchsuchen
+- AAS versioniert in einem lokalen Repository speichern, laden, vergleichen, nach Asset/Manufacturer/Semantic ID/Submodel durchsuchen und Traceability Events anzeigen
 - AAS-Strukturen gegen zentrale AAS-3.x-Metamodellregeln validieren
 - AAS, Submodels und Submodel Elements per Tree navigieren und durchsuchen
+- Dashboard-Karten und Numeric-Charts aus geladenen Submodel Elements erstellen, speichern und live aktualisieren
 - Ausgewaehlte Explorer-Knoten im Side-by-side JSON Inspector pruefen
 - Zwei Repository-Versionen eines AAS vergleichen und Aenderungen nach hinzugefuegt, entfernt und geaendert sehen
 - Ergebnis als JSON, `.aasx`, PDF-Report, Excel-Arbeitsmappe oder Validierungsreport exportieren
@@ -54,6 +55,10 @@ Der manuelle Generator erstellt aus Asset-Daten, mehreren Submodels und mehreren
 
 Das Gateway-Formular ergänzt die aktuell geladene AAS um ein `GatewayMapping`-Submodel. Darin werden Protokoll, Endpoint/Broker, OPC-UA-Node-ID oder MQTT-Topic, Ziel-Property und Sampling-Intervall abgelegt. Es ist aktuell eine exportierbare Konfiguration, noch keine Live-Verbindung zu OPC UA oder MQTT.
 
+## Dashboard Builder
+
+Der Dashboard Builder erstellt Widgets aus den Submodel Elements der aktuell geladenen AAS. `Card`-Widgets zeigen den letzten Wert mit Einheit, Value Type, Pfad und Semantic ID. `Chart`-Widgets sind fuer numerische Werte verfuegbar und halten eine kleine Wertehistorie aus manueller oder automatischer Aktualisierung. Layouts werden lokal im Browser gespeichert und koennen spaeter auf dieselbe AAS-Struktur angewendet werden.
+
 ## Start
 
 ```bash
@@ -73,6 +78,7 @@ http://localhost:8081/#import
 http://localhost:8081/#generator
 http://localhost:8081/#gateway
 http://localhost:8081/#repository
+http://localhost:8081/#dashboard
 http://localhost:8081/#explorer
 ```
 
@@ -92,6 +98,8 @@ GET  /api/aas/:id/events
 Die Repository-Daten werden lokal in `data/repository.json` gespeichert. Diese Datei ist absichtlich nicht versioniert.
 Im Repository kann ein gespeichertes AAS ueber zwei Versionsauswahlen verglichen werden. Der Compare View zeigt Kennzahlen, Version-Metadaten und strukturelle Unterschiede fuer AAS, Submodels und Submodel Elements.
 Die Repository-Liste kann nach Asset-ID/AAS-ID/Name, Manufacturer-Werten, Semantic IDs und Submodel-ID oder `idShort` gefiltert werden. Dafuer wird die jeweils letzte gespeicherte Version des AAS ausgewertet.
+Die Repository-Rolle steuert den Zugriff: `Viewer` darf laden, vergleichen und Traceability Events ansehen; `Editor` und `Admin` duerfen zusaetzlich neue AAS-Versionen speichern. Die Rolle wird als `X-Workbench-Role` an die API gesendet, und der Server blockiert Schreibzugriffe fuer read-only Rollen.
+Der Event-View zeigt gespeicherte Traceability Events mit Version, Zeitpunkt, Bearbeiter, Rolle, Asset-ID und Shell-ID.
 
 ## Tabellenimport
 

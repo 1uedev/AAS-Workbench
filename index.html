@@ -18,6 +18,7 @@
         <a href="#generator" data-route-link="generator">Generator</a>
         <a href="#gateway" data-route-link="gateway">Gateway</a>
         <a href="#repository" data-route-link="repository">Repository</a>
+        <a href="#dashboard" data-route-link="dashboard">Dashboard</a>
         <a href="#explorer" data-route-link="explorer">Explorer</a>
       </nav>
       <div class="header-actions">
@@ -60,6 +61,11 @@
           <span class="feature-kicker">Repository</span>
           <strong>Versioniert speichern</strong>
           <span>AAS-Versionen sichern, laden und Traceability-Events nachvollziehen.</span>
+        </a>
+        <a class="feature-card" href="#dashboard">
+          <span class="feature-kicker">Dashboard</span>
+          <strong>Submodel-Werte beobachten</strong>
+          <span>Karten und Charts aus geladenen Submodel Elements zusammenstellen.</span>
         </a>
       </section>
     </main>
@@ -185,6 +191,17 @@
           <h2 id="repository-title">AAS versionieren</h2>
         </div>
         <form id="repositoryForm" class="tool-form">
+          <div class="repository-access-panel">
+            <label class="field">
+              <span>Repository Role</span>
+              <select id="repositoryRoleSelect">
+                <option value="viewer">Viewer</option>
+                <option value="editor" selected>Editor</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <div id="repositoryAccessSummary" class="repository-access-summary">Editor darf AAS laden und speichern.</div>
+          </div>
           <label class="field">
             <span>Change Reason</span>
             <input id="repositoryReason" name="changeReason" placeholder="Initial import, gateway mapping update, manual correction ..." />
@@ -220,6 +237,42 @@
         </form>
         <div id="repositoryStatus" class="summary-text">Backend-Status wird beim Aktualisieren geprüft.</div>
         <div id="repositoryList" class="repository-list"></div>
+        <div id="repositoryEvents" class="repository-events-empty">Waehle ein AAS aus, um Traceability Events zu sehen.</div>
+      </section>
+
+      <section class="workspace-panel dashboard-panel" data-panel="dashboard" aria-labelledby="dashboard-title">
+        <div class="section-heading">
+          <p class="eyebrow">Dashboard</p>
+          <h2 id="dashboard-title">AAS Dashboard Builder</h2>
+        </div>
+        <div class="dashboard-toolbar">
+          <label class="field">
+            <span>Submodel Element</span>
+            <select id="dashboardElementSelect" disabled>
+              <option>Keine AAS geladen</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Widget</span>
+            <select id="dashboardWidgetType" disabled>
+              <option value="card">Card</option>
+              <option value="chart">Chart</option>
+            </select>
+          </label>
+          <label class="checkbox-field dashboard-live-toggle">
+            <input id="dashboardLiveToggle" type="checkbox" />
+            <span>Live refresh</span>
+          </label>
+          <button id="addDashboardWidgetButton" class="primary-button" type="button" disabled>Widget hinzufügen</button>
+        </div>
+        <div class="dashboard-actions">
+          <button id="refreshDashboardButton" class="secondary-button" type="button" disabled>Werte aktualisieren</button>
+          <button id="saveDashboardLayoutButton" class="secondary-button" type="button" disabled>Layout speichern</button>
+          <button id="loadDashboardLayoutButton" class="secondary-button" type="button">Layout laden</button>
+          <button id="clearDashboardLayoutButton" class="secondary-button" type="button" disabled>Layout leeren</button>
+        </div>
+        <div id="dashboardStatus" class="summary-text">Lade eine AAS, um Dashboard Widgets zu erstellen.</div>
+        <div id="dashboardGrid" class="dashboard-empty">Noch keine Widgets.</div>
       </section>
 
       <section class="workspace-panel compare-panel" data-panel="compare" aria-labelledby="compare-title">

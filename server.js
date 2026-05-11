@@ -8,6 +8,8 @@ const rootDir = __dirname;
 const dataDir = path.join(rootDir, "data");
 const repositoryPath = path.join(dataDir, "repository.json");
 const port = Number(process.env.PORT || 8081);
+const writeRoles = new Set(["editor", "admin"]);
+const repositoryRoles = new Set(["viewer", "editor", "admin"]);
 
 const contentTypes = {
   ".aasx": "application/asset-administration-shell-package",
@@ -31,7 +33,7 @@ const server = http.createServer(async (request, response) => {
 
     serveStatic(response, url.pathname);
   } catch (error) {
-    sendJson(response, 500, { error: error.message });
+    sendJson(response, error.status || 500, { error: error.message });
   }
 });
 
@@ -58,8 +60,9 @@ async function handleApi(request, response, url) {
   }
 
   if (request.method === "POST" && parts.length === 2) {
+    const role = requireRepositoryWriteAccess(request);
     const body = await readJsonBody(request);
-    sendJson(response, 201, saveAasVersion(body));
+    sendJson(response, 201, saveAasVersion(body, role));
     return;
   }
 
@@ -92,7 +95,7 @@ async function handleApi(request, response, url) {
   sendJson(response, 404, { error: "API route not found" });
 }
 
-function saveAasVersion(body) {
+function saveAasVersion(body, role = "editor") {
   const payload = body?.payload;
   if (!payload?.assetAdministrationShells?.length) {
     const error = new Error("payload.assetAdministrationShells is required");
@@ -140,6 +143,7 @@ function saveAasVersion(body) {
     createdAt: now,
     metadata: {
       createdBy: versionRecord.createdBy,
+      role,
       shellId: shell.id,
       globalAssetId,
     },
@@ -153,6 +157,21 @@ function saveAasVersion(body) {
     version,
     createdAt: versionRecord.createdAt,
   };
+}
+
+function requireRepositoryWriteAccess(request) {
+  const role = getRepositoryRole(request);
+  if (!writeRoles.has(role)) {
+    const error = new Error(`Repository role "${role}" is read-only`);
+    error.status = 403;
+    throw error;
+  }
+  return role;
+}
+
+function getRepositoryRole(request) {
+  const role = String(request.headers["x-workbench-role"] || "editor").trim().toLowerCase();
+  return repositoryRoles.has(role) ? role : "viewer";
 }
 
 function listAssets() {

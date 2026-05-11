@@ -4,19 +4,7 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add roles and access control.
-
-## Repository Enhancements
-
-- [ ] Add roles and access control.
-- [ ] Add explicit traceability event view in the UI.
-
-## AAS Dashboard Builder
-
-- [ ] Create dashboard cards from selected Submodel Elements.
-- [ ] Add chart widgets for numeric values.
-- [ ] Add saved dashboard layouts.
-- [ ] Add live value display once gateway backend exists.
+- [ ] Build backend service for OPC UA connections.
 
 ## Live OPC UA / MQTT Gateway Backend
 

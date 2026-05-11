@@ -9,6 +9,8 @@
   - `#import`
   - `#generator`
   - `#gateway`
+  - `#repository`
+  - `#dashboard`
   - `#explorer`
 - Added AAS JSON import.
 - Added drag-and-drop support for the import drop zone.
@@ -104,6 +106,16 @@
   - Manufacturer values
   - Semantic IDs
   - Submodel IDs and idShorts
+- Added Repository role selector and access control:
+  - Viewer can load, compare and inspect events
+  - Editor and Admin can also save new AAS versions
+  - Backend rejects read-only Repository writes
+- Added explicit Repository Traceability Event view backed by `/api/aas/:id/events`.
+- Added AAS Dashboard Builder:
+  - Dashboard cards from selected Submodel Elements
+  - Numeric chart widgets with short value history
+  - Saved dashboard layouts in browser storage
+  - Manual and automatic live value refresh from the loaded AAS payload
 - Added sample CSV data.
 - Replaced the flat Explorer list with expandable tree navigation for AAS, Submodels and nested Submodel Elements.
 - Added side-by-side JSON inspector for the selected Explorer node.
@@ -132,6 +144,9 @@
   - Import route and drop-zone UI
   - Repository route
   - Repository search by asset, manufacturer, semantic ID and submodel
+  - Repository role-based save access
+  - Repository Traceability Event loading
+  - Dashboard route, card widgets, numeric charts, layout save/load and live refresh toggle
   - Repository save and version load
   - Sample loading
   - Manual generator
