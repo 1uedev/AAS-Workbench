@@ -32,40 +32,70 @@
     </header>
 
     <main id="homePage" class="home-page">
-      <section class="home-intro" aria-labelledby="home-title">
-        <p class="eyebrow">Workbench</p>
-        <h2 id="home-title">AAS-Daten erzeugen, prüfen, mappen und exportieren</h2>
+      <section class="home-workbench" aria-labelledby="home-title">
+        <div class="home-intro">
+          <p class="eyebrow">Workbench</p>
+          <h2 id="home-title">AAS-Daten strukturiert bearbeiten</h2>
+          <p>
+            Importiere, generiere, validiere und versioniere AAS-Pakete in einem lokalen Arbeitsbereich.
+            Starte mit einer Datei oder einem Template und gehe danach direkt in Explorer, Repository oder Dashboard.
+          </p>
+          <div class="home-actions" aria-label="Schnellstart">
+            <a class="home-primary-action" href="#import">Datei importieren</a>
+            <a class="home-secondary-action" href="#generator">AAS erzeugen</a>
+            <button class="home-secondary-action" id="homeLoadSampleButton" type="button">Beispiel laden</button>
+            <a class="home-secondary-action" href="#repository">Repository öffnen</a>
+          </div>
+        </div>
+        <aside class="home-flow" aria-label="Workflow">
+          <div>
+            <span>1</span>
+            <strong>Erfassen</strong>
+            <p>AASX, JSON, CSV, Excel oder Generator-Template.</p>
+          </div>
+          <div>
+            <span>2</span>
+            <strong>Prüfen</strong>
+            <p>AAS-3.x-Struktur, Referenzen, Semantik, Datentypen und Units.</p>
+          </div>
+          <div>
+            <span>3</span>
+            <strong>Nutzen</strong>
+            <p>Explorer, Repository, Compare, Dashboard und Exporte.</p>
+          </div>
+        </aside>
       </section>
-      <section class="feature-grid" aria-label="Funktionen">
-        <a class="feature-card" href="#import">
+
+      <section class="home-module-grid" aria-label="Arbeitsbereiche">
+        <a class="home-module home-module-wide" href="#import">
           <span class="feature-kicker">Import</span>
           <strong>AASX, AAS-JSON, Excel oder CSV prüfen</strong>
-          <span>AASX laden oder Tabellen per Mapping-Dialog in eine AAS-Struktur ueberfuehren.</span>
+          <span>AASX laden oder Tabellen per Mapping-Dialog und Batch-Regeln in eine AAS-Struktur ueberfuehren.</span>
         </a>
-        <a class="feature-card" href="#generator">
+        <a class="home-module" href="#generator">
           <span class="feature-kicker">Generator</span>
           <strong>AAS manuell erzeugen</strong>
-          <span>Asset, Submodel und Property direkt aus Formularfeldern erstellen.</span>
+          <span>Assets, Submodels, Properties und wiederverwendbare Templates zusammenstellen.</span>
         </a>
-        <a class="feature-card" href="#gateway">
-          <span class="feature-kicker">Gateway</span>
-          <strong>OPC UA / MQTT Mapping</strong>
-          <span>Gateway-Konfiguration als exportierbares AAS-Submodel ablegen.</span>
-        </a>
-        <a class="feature-card" href="#explorer">
+        <a class="home-module" href="#explorer">
           <span class="feature-kicker">Explorer</span>
-          <strong>Validieren und durchsuchen</strong>
-          <span>AAS-Struktur, Issues, Submodels und Properties inspizieren.</span>
+          <strong>Struktur verstehen</strong>
+          <span>Baumansicht, Suche und JSON-Inspector fuer geladene AAS-Pakete.</span>
         </a>
-        <a class="feature-card" href="#repository">
+        <a class="home-module" href="#repository">
           <span class="feature-kicker">Repository</span>
-          <strong>Versioniert speichern</strong>
-          <span>AAS-Versionen sichern, laden und Traceability-Events nachvollziehen.</span>
+          <strong>Versionen sichern</strong>
+          <span>Speichern, Rollen, Suche, Compare und Traceability Events.</span>
         </a>
-        <a class="feature-card" href="#dashboard">
+        <a class="home-module" href="#dashboard">
           <span class="feature-kicker">Dashboard</span>
-          <strong>Submodel-Werte beobachten</strong>
-          <span>Karten und Charts aus geladenen Submodel Elements zusammenstellen.</span>
+          <strong>Werte beobachten</strong>
+          <span>Karten, Numeric-Charts, Layouts und Live-Refresh aus Submodel Elements.</span>
+        </a>
+        <a class="home-module" href="#gateway">
+          <span class="feature-kicker">Gateway</span>
+          <strong>OPC UA / MQTT vorbereiten</strong>
+          <span>Gateway-Mappings als exportierbares AAS-Submodel dokumentieren.</span>
         </a>
       </section>
     </main>

@@ -7,6 +7,7 @@ import { createValidationReportBlob } from "./validation-report-export.js";
 const fileInput = document.querySelector("#fileInput");
 const dropZone = document.querySelector(".drop-zone");
 const loadSampleButton = document.querySelector("#loadSampleButton");
+const homeLoadSampleButton = document.querySelector("#homeLoadSampleButton");
 const downloadButton = document.querySelector("#downloadButton");
 const downloadAasxButton = document.querySelector("#downloadAasxButton");
 const downloadPdfButton = document.querySelector("#downloadPdfButton");
@@ -535,11 +536,14 @@ async function importSelectedFile(file) {
   }
 }
 
-loadSampleButton.addEventListener("click", () => {
+function loadSamplePackage() {
   currentFileName = "sample-aas";
   loadPackage(rowsToAasPackage(parseCsv(sampleCsv)));
   navigateTo("explorer");
-});
+}
+
+loadSampleButton.addEventListener("click", loadSamplePackage);
+homeLoadSampleButton.addEventListener("click", loadSamplePackage);
 
 downloadButton.addEventListener("click", () => {
   if (!currentPackage) return;
