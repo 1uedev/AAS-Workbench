@@ -267,6 +267,7 @@ function serveStatic(response, pathname) {
   const extension = path.extname(filePath);
   response.writeHead(200, {
     "Content-Type": contentTypes[extension] || "application/octet-stream",
+    "Cache-Control": "no-store",
   });
   fs.createReadStream(filePath).pipe(response);
 }

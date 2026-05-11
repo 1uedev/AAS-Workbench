@@ -6,10 +6,10 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 
 - Hauptseite mit Unterseiten fuer Import, Generator, Gateway und Explorer
 - AASX und AAS-JSON per Dateiauswahl oder Drag-and-Drop laden und prüfen
-- AAS manuell über einen Multi-Submodel-/Multi-Property-Generator erzeugen
-- CSV- und Excel-Dateien (`.xlsx`) mit Mapping-Dialog in eine einfache AAS-Struktur umwandeln
+- AAS manuell ueber einen Multi-Submodel-/Multi-Property-Generator mit Submodel-Templates und Vorschau erzeugen
+- CSV- und Excel-Dateien (`.xlsx`) mit Mapping-Dialog und Batch-Optionen in eine einfache AAS-Struktur umwandeln
 - OPC-UA- und MQTT-Quellen als Gateway-Mapping-Submodel dokumentieren
-- AAS versioniert in einem lokalen Repository speichern und laden
+- AAS versioniert in einem lokalen Repository speichern, laden und nach Asset, Manufacturer, Semantic ID oder Submodel durchsuchen
 - AAS-Strukturen gegen zentrale AAS-3.x-Metamodellregeln validieren
 - AAS, Submodels und Submodel Elements per Tree navigieren und durchsuchen
 - Ausgewaehlte Explorer-Knoten im Side-by-side JSON Inspector pruefen
@@ -50,7 +50,7 @@ Die Validierung prueft zentrale AAS-3.x-Regeln: Pflichtfelder, `modelType`, `idS
 
 ## Generator und Gateway
 
-Der manuelle Generator erstellt aus Asset-Daten, mehreren Submodels und mehreren Properties pro Submodel direkt eine AAS-Umgebung.
+Der manuelle Generator erstellt aus Asset-Daten, mehreren Submodels und mehreren Properties pro Submodel direkt eine AAS-Umgebung. Wiederverwendbare Submodel-Templates fuer Technical Data, Nameplate, Operational Data und Maintenance koennen eingefuegt und vorab geprueft werden. Eine Live-Vorschau zeigt vor der Erzeugung, welche AAS, Submodels und Properties entstehen.
 
 Das Gateway-Formular ergänzt die aktuell geladene AAS um ein `GatewayMapping`-Submodel. Darin werden Protokoll, Endpoint/Broker, OPC-UA-Node-ID oder MQTT-Topic, Ziel-Property und Sampling-Intervall abgelegt. Es ist aktuell eine exportierbare Konfiguration, noch keine Live-Verbindung zu OPC UA oder MQTT.
 
@@ -91,6 +91,7 @@ GET  /api/aas/:id/events
 
 Die Repository-Daten werden lokal in `data/repository.json` gespeichert. Diese Datei ist absichtlich nicht versioniert.
 Im Repository kann ein gespeichertes AAS ueber zwei Versionsauswahlen verglichen werden. Der Compare View zeigt Kennzahlen, Version-Metadaten und strukturelle Unterschiede fuer AAS, Submodels und Submodel Elements.
+Die Repository-Liste kann nach Asset-ID/AAS-ID/Name, Manufacturer-Werten, Semantic IDs und Submodel-ID oder `idShort` gefiltert werden. Dafuer wird die jeweils letzte gespeicherte Version des AAS ausgewertet.
 
 ## Tabellenimport
 
@@ -107,6 +108,8 @@ Pflichtfelder:
 ```text
 assetId, assetName, submodelId, submodelName, idShort, valueType, value
 ```
+
+Der Mapping-Dialog unterstuetzt Batch-Optionen fuer Gruppierung nach Asset ID oder eine einzelne AAS, Umgang mit doppelten Properties und das Ueberspringen leerer Value-Zeilen.
 
 Siehe [samples/sample-assets.csv](samples/sample-assets.csv).
 

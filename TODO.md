@@ -4,19 +4,10 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add reusable Submodel templates.
-
-## Generator Enhancements
-
-- [ ] Add richer batch generation controls for mapped tables.
-- [ ] Add template preview before generation.
+- [ ] Add roles and access control.
 
 ## Repository Enhancements
 
-- [ ] Add search by asset.
-- [ ] Add search by manufacturer.
-- [ ] Add search by semantic ID.
-- [ ] Add search by submodel.
 - [ ] Add roles and access control.
 - [ ] Add explicit traceability event view in the UI.
 

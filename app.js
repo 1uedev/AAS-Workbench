@@ -34,13 +34,23 @@ const cancelMappingButton = document.querySelector("#cancelMappingButton");
 const manualGeneratorForm = document.querySelector("#manualGeneratorForm");
 const submodelBuilder = document.querySelector("#submodelBuilder");
 const addSubmodelButton = document.querySelector("#addSubmodelButton");
+const submodelTemplateSelect = document.querySelector("#submodelTemplateSelect");
+const addTemplateButton = document.querySelector("#addTemplateButton");
+const templatePreview = document.querySelector("#templatePreview");
+const generatorPreview = document.querySelector("#generatorPreview");
 const gatewayForm = document.querySelector("#gatewayForm");
 const repositoryForm = document.querySelector("#repositoryForm");
 const repositoryReason = document.querySelector("#repositoryReason");
 const saveRepositoryButton = document.querySelector("#saveRepositoryButton");
 const refreshRepositoryButton = document.querySelector("#refreshRepositoryButton");
+const repositorySearchForm = document.querySelector("#repositorySearchForm");
 const repositoryStatus = document.querySelector("#repositoryStatus");
 const repositoryList = document.querySelector("#repositoryList");
+const repositoryAssetSearch = document.querySelector("#repositoryAssetSearch");
+const repositoryManufacturerSearch = document.querySelector("#repositoryManufacturerSearch");
+const repositorySemanticSearch = document.querySelector("#repositorySemanticSearch");
+const repositorySubmodelSearch = document.querySelector("#repositorySubmodelSearch");
+const clearRepositorySearchButton = document.querySelector("#clearRepositorySearchButton");
 const compareResult = document.querySelector("#compareResult");
 const routeLinks = [...document.querySelectorAll("[data-route-link]")];
 
@@ -307,8 +317,128 @@ urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:TechnicalData,
 urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:OperationalData,Operational Data,OperatingHours,integer,1840,https://admin-shell.io/idta/OperatingHours,h
 urn:example:asset:Pump-001,Pump 001,urn:example:submodel:Pump-001:OperationalData,Operational Data,Status,string,Running,https://admin-shell.io/idta/Status,`;
 
+const submodelTemplates = [
+  {
+    key: "technicalData",
+    label: "Technical Data",
+    description: "Basisdaten fuer Hersteller, Seriennummer und Nennleistung.",
+    idShort: "TechnicalData",
+    properties: [
+      {
+        idShort: "Manufacturer",
+        valueType: "string",
+        value: "ACME Industrial",
+        semanticId: "https://admin-shell.io/idta/Manufacturer",
+        unit: "",
+      },
+      {
+        idShort: "SerialNumber",
+        valueType: "string",
+        value: "SN-001",
+        semanticId: "https://admin-shell.io/idta/SerialNumber",
+        unit: "",
+      },
+      {
+        idShort: "NominalPower",
+        valueType: "double",
+        value: "7.5",
+        semanticId: "https://admin-shell.io/idta/NominalPower",
+        unit: "kW",
+      },
+    ],
+  },
+  {
+    key: "nameplate",
+    label: "Nameplate",
+    description: "Typenschilddaten fuer Produktbezeichnung, Hersteller und Baujahr.",
+    idShort: "Nameplate",
+    properties: [
+      {
+        idShort: "ManufacturerName",
+        valueType: "string",
+        value: "ACME Industrial",
+        semanticId: "https://admin-shell.io/idta/ManufacturerName",
+        unit: "",
+      },
+      {
+        idShort: "ManufacturerProductDesignation",
+        valueType: "string",
+        value: "Pump 001",
+        semanticId: "https://admin-shell.io/idta/ManufacturerProductDesignation",
+        unit: "",
+      },
+      {
+        idShort: "YearOfConstruction",
+        valueType: "integer",
+        value: "2026",
+        semanticId: "https://admin-shell.io/idta/YearOfConstruction",
+        unit: "",
+      },
+    ],
+  },
+  {
+    key: "operationalData",
+    label: "Operational Data",
+    description: "Betriebswerte fuer Laufzeit, Status und Auslastung.",
+    idShort: "OperationalData",
+    properties: [
+      {
+        idShort: "OperatingHours",
+        valueType: "integer",
+        value: "1840",
+        semanticId: "https://admin-shell.io/idta/OperatingHours",
+        unit: "h",
+      },
+      {
+        idShort: "Status",
+        valueType: "string",
+        value: "Running",
+        semanticId: "https://admin-shell.io/idta/Status",
+        unit: "",
+      },
+      {
+        idShort: "Utilization",
+        valueType: "double",
+        value: "72.5",
+        semanticId: "https://admin-shell.io/idta/Utilization",
+        unit: "%",
+      },
+    ],
+  },
+  {
+    key: "maintenance",
+    label: "Maintenance",
+    description: "Wartungsdaten fuer letzte und naechste Instandhaltung.",
+    idShort: "Maintenance",
+    properties: [
+      {
+        idShort: "LastMaintenanceDate",
+        valueType: "date",
+        value: "2026-01-15",
+        semanticId: "https://admin-shell.io/idta/LastMaintenanceDate",
+        unit: "",
+      },
+      {
+        idShort: "NextMaintenanceIn",
+        valueType: "integer",
+        value: "500",
+        semanticId: "https://admin-shell.io/idta/NextMaintenanceIn",
+        unit: "h",
+      },
+      {
+        idShort: "MaintenanceStatus",
+        valueType: "string",
+        value: "Planned",
+        semanticId: "https://admin-shell.io/idta/MaintenanceStatus",
+        unit: "",
+      },
+    ],
+  },
+];
+
 window.addEventListener("hashchange", applyRoute);
 applyRoute();
+renderTemplateOptions();
 addSubmodelEditor({
   idShort: "TechnicalData",
   properties: [
@@ -321,6 +451,8 @@ addSubmodelEditor({
     },
   ],
 });
+renderTemplatePreview();
+renderGeneratorPreview();
 updateTreeControls(false);
 
 fileInput.addEventListener("change", async (event) => {
@@ -489,6 +621,14 @@ repositoryForm.addEventListener("submit", async (event) => {
 
 refreshRepositoryButton.addEventListener("click", refreshRepository);
 
+[repositoryAssetSearch, repositoryManufacturerSearch, repositorySemanticSearch, repositorySubmodelSearch].forEach((input) => {
+  input.addEventListener("input", renderFilteredRepositoryList);
+});
+
+repositorySearchForm.addEventListener("reset", () => window.setTimeout(renderFilteredRepositoryList));
+clearRepositorySearchButton.addEventListener("click", clearRepositorySearch);
+clearRepositorySearchButton.addEventListener("pointerdown", clearRepositorySearch);
+
 repositoryList.addEventListener("click", async (event) => {
   const loadVersionButton = event.target.closest("[data-action='load-version']");
   if (loadVersionButton) {
@@ -520,10 +660,21 @@ manualGeneratorForm.addEventListener("submit", (event) => {
 
 addSubmodelButton.addEventListener("click", () => addSubmodelEditor());
 
+addTemplateButton.addEventListener("click", () => {
+  const template = getSelectedSubmodelTemplate();
+  if (!template) return;
+  addSubmodelEditor(cloneTemplateSeed(template));
+});
+
+submodelTemplateSelect.addEventListener("change", renderTemplatePreview);
+manualGeneratorForm.addEventListener("input", renderGeneratorPreview);
+manualGeneratorForm.addEventListener("change", renderGeneratorPreview);
+
 submodelBuilder.addEventListener("click", (event) => {
   const addPropertyButton = event.target.closest("[data-action='add-property']");
   if (addPropertyButton) {
     addPropertyEditor(addPropertyButton.closest(".submodel-editor").querySelector(".property-list"));
+    renderGeneratorPreview();
     return;
   }
 
@@ -533,6 +684,7 @@ submodelBuilder.addEventListener("click", (event) => {
     const propertyList = propertyEditor.closest(".property-list");
     if (propertyList.querySelectorAll(".property-editor").length > 1) {
       propertyEditor.remove();
+      renderGeneratorPreview();
     }
     return;
   }
@@ -540,6 +692,7 @@ submodelBuilder.addEventListener("click", (event) => {
   const removeSubmodelButton = event.target.closest("[data-action='remove-submodel']");
   if (removeSubmodelButton && submodelBuilder.querySelectorAll(".submodel-editor").length > 1) {
     removeSubmodelButton.closest(".submodel-editor").remove();
+    renderGeneratorPreview();
   }
 });
 
@@ -568,7 +721,13 @@ mappingForm.addEventListener("submit", (event) => {
     return;
   }
 
-  loadPackage(rowsToAasPackage(pendingTableImport.rows, mapping));
+  const batchOptions = {
+    assetMode: formData.get("batchAssetMode"),
+    duplicateMode: formData.get("batchDuplicateMode"),
+    skipEmptyValues: formData.get("batchSkipEmptyValues") === "on",
+  };
+
+  loadPackage(rowsToAasPackage(pendingTableImport.rows, mapping, batchOptions));
   mappingDialog.close();
   pendingTableImport = null;
 });
@@ -600,6 +759,94 @@ function navigateTo(route) {
 function closeMappingDialog() {
   pendingTableImport = null;
   mappingDialog.close();
+}
+
+function renderTemplateOptions() {
+  submodelTemplateSelect.innerHTML = submodelTemplates
+    .map((template) => `<option value="${template.key}">${escapeHtml(template.label)}</option>`)
+    .join("");
+}
+
+function getSelectedSubmodelTemplate() {
+  return submodelTemplates.find((template) => template.key === submodelTemplateSelect.value) ?? submodelTemplates[0];
+}
+
+function cloneTemplateSeed(template) {
+  return {
+    idShort: template.idShort,
+    properties: template.properties.map((property) => ({ ...property })),
+  };
+}
+
+function renderTemplatePreview() {
+  const template = getSelectedSubmodelTemplate();
+  if (!template) {
+    templatePreview.textContent = "Kein Template ausgewaehlt.";
+    return;
+  }
+
+  templatePreview.innerHTML = `
+    <div class="preview-card">
+      <h3>${escapeHtml(template.label)}</h3>
+      <p>${escapeHtml(template.description)}</p>
+      <div class="preview-tags">
+        ${template.properties
+          .map((property) => `<span>${escapeHtml(property.idShort)} (${escapeHtml(property.valueType)})</span>`)
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderGeneratorPreview() {
+  const formData = new FormData(manualGeneratorForm);
+  const assetId = String(formData.get("assetId") ?? "").trim();
+  const assetName = String(formData.get("assetName") ?? "").trim();
+  const submodels = [...submodelBuilder.querySelectorAll(".submodel-editor")].map((submodelEditor) => {
+    const submodelName = submodelEditor.querySelector("[data-field='submodelName']").value.trim();
+    const explicitSubmodelId = submodelEditor.querySelector("[data-field='submodelId']").value.trim();
+    const properties = [...submodelEditor.querySelectorAll(".property-editor")].map((propertyEditor) => {
+      return {
+        idShort: propertyEditor.querySelector("[data-field='idShort']").value.trim() || "Property",
+        valueType: propertyEditor.querySelector("[data-field='valueType']").value || "string",
+        value: propertyEditor.querySelector("[data-field='value']").value.trim(),
+      };
+    });
+
+    return {
+      id: explicitSubmodelId || (assetId && submodelName ? `${assetId}:submodel:${toIdShort(submodelName)}` : ""),
+      name: submodelName || "Submodel",
+      properties,
+    };
+  });
+  const propertyCount = submodels.reduce((count, submodel) => count + submodel.properties.length, 0);
+  const assetLabel = assetName || assetId || "Noch kein Asset";
+
+  generatorPreview.innerHTML = `
+    <div class="preview-card">
+      <h3>${escapeHtml(assetLabel)}</h3>
+      <p>${escapeHtml(assetId || "Asset ID fehlt noch")} | ${submodels.length} Submodel | ${propertyCount} Properties</p>
+    </div>
+    ${submodels
+      .map((submodel) => {
+        const properties = submodel.properties.length
+          ? submodel.properties
+              .map((property) => {
+                const value = property.value ? ` = ${property.value}` : "";
+                return `<span>${escapeHtml(property.idShort)} (${escapeHtml(property.valueType)})${escapeHtml(value)}</span>`;
+              })
+              .join("")
+          : "<span>Keine Properties</span>";
+        return `
+          <div class="preview-card">
+            <h4>${escapeHtml(submodel.name)}</h4>
+            <p>${escapeHtml(submodel.id || "Submodel ID wird aus Asset ID und Name erzeugt")}</p>
+            <div class="preview-tags">${properties}</div>
+          </div>
+        `;
+      })
+      .join("")}
+  `;
 }
 
 function addSubmodelEditor(seed = {}) {
@@ -636,6 +883,7 @@ function addSubmodelEditor(seed = {}) {
   const propertyList = submodel.querySelector(".property-list");
   const properties = seed.properties?.length ? seed.properties : [{}];
   properties.forEach((property) => addPropertyEditor(propertyList, property));
+  renderGeneratorPreview();
 }
 
 function addPropertyEditor(propertyList, seed = {}) {
@@ -779,15 +1027,180 @@ async function refreshRepository() {
   try {
     repositoryStatus.textContent = "Repository wird geladen ...";
     const response = await fetch("/api/aas");
-    repositoryAssets = await readApiResponse(response);
-    renderRepositoryList(repositoryAssets);
-    repositoryStatus.textContent = repositoryAssets.length
-      ? `${repositoryAssets.length} AAS im Repository.`
-      : "Repository ist erreichbar, aber noch leer.";
+    repositoryAssets = await enrichRepositoryAssets(await readApiResponse(response));
+    renderFilteredRepositoryList();
   } catch (error) {
     repositoryStatus.textContent = `Repository nicht verfuegbar: ${error.message}`;
     repositoryList.innerHTML = "";
   }
+}
+
+async function enrichRepositoryAssets(assets) {
+  return Promise.all(
+    assets.map(async (asset) => {
+      try {
+        const latestVersion = await fetchRepositoryVersion(asset.id, asset.latestVersion);
+        const payload = normalizeAasJson(latestVersion.payload);
+        return {
+          ...asset,
+          searchIndex: buildRepositorySearchIndex(asset, payload),
+        };
+      } catch (error) {
+        return {
+          ...asset,
+          searchIndex: buildRepositorySearchIndex(asset),
+          searchError: error.message,
+        };
+      }
+    }),
+  );
+}
+
+function renderFilteredRepositoryList() {
+  const filteredAssets = filterRepositoryAssets(repositoryAssets);
+  renderRepositoryList(filteredAssets);
+  repositoryStatus.textContent = formatRepositoryStatus(repositoryAssets.length, filteredAssets.length);
+}
+
+function clearRepositorySearch(event) {
+  event.preventDefault();
+  repositorySearchForm.reset();
+  repositoryAssetSearch.value = "";
+  repositoryManufacturerSearch.value = "";
+  repositorySemanticSearch.value = "";
+  repositorySubmodelSearch.value = "";
+  renderFilteredRepositoryList();
+}
+
+function filterRepositoryAssets(assets) {
+  const queries = getRepositorySearchQueries();
+  return assets.filter((asset) => {
+    const searchIndex = asset.searchIndex ?? buildRepositorySearchIndex(asset);
+    return (
+      matchesRepositoryQuery(searchIndex.assetText, queries.asset) &&
+      matchesRepositoryQuery(searchIndex.manufacturerText, queries.manufacturer) &&
+      matchesRepositoryQuery(searchIndex.semanticText, queries.semanticId) &&
+      matchesRepositoryQuery(searchIndex.submodelText, queries.submodel)
+    );
+  });
+}
+
+function getRepositorySearchQueries() {
+  return {
+    asset: repositoryAssetSearch.value.trim(),
+    manufacturer: repositoryManufacturerSearch.value.trim(),
+    semanticId: repositorySemanticSearch.value.trim(),
+    submodel: repositorySubmodelSearch.value.trim(),
+  };
+}
+
+function hasRepositorySearch() {
+  return Object.values(getRepositorySearchQueries()).some(Boolean);
+}
+
+function matchesRepositoryQuery(text, query) {
+  const terms = normalizeSearchText([query]).split(" ").filter(Boolean);
+  if (terms.length === 0) return true;
+  return terms.every((term) => text.includes(term));
+}
+
+function formatRepositoryStatus(totalCount, filteredCount) {
+  if (totalCount === 0) return "Repository ist erreichbar, aber noch leer.";
+  if (hasRepositorySearch()) return `${filteredCount} von ${totalCount} AAS gefunden.`;
+  return `${totalCount} AAS im Repository.`;
+}
+
+function buildRepositorySearchIndex(asset, aasPackage = {}) {
+  const assetTerms = new Set([asset.id, asset.idShort, asset.globalAssetId]);
+  const manufacturerTerms = new Set();
+  const semanticTerms = new Set();
+  const submodelTerms = new Set();
+
+  for (const shell of aasPackage.assetAdministrationShells ?? []) {
+    addSearchValues(assetTerms, [
+      shell.id,
+      shell.idShort,
+      shell.assetInformation?.globalAssetId,
+      ...(shell.assetInformation?.specificAssetIds ?? []).flatMap((specificAssetId) => [
+        specificAssetId.name,
+        specificAssetId.value,
+      ]),
+    ]);
+    (shell.submodels ?? []).forEach((reference) => addSearchValues(submodelTerms, getReferenceValues(reference)));
+    collectSemanticValues(shell, semanticTerms);
+  }
+
+  for (const submodel of aasPackage.submodels ?? []) {
+    addSearchValues(submodelTerms, [submodel.id, submodel.idShort]);
+    collectSemanticValues(submodel, semanticTerms);
+    (submodel.submodelElements ?? []).forEach((element) => collectRepositoryElementSearch(element, manufacturerTerms));
+  }
+
+  for (const conceptDescription of aasPackage.conceptDescriptions ?? []) {
+    collectSemanticValues(conceptDescription, semanticTerms);
+  }
+
+  return {
+    assetText: normalizeSearchText(assetTerms),
+    manufacturerText: normalizeSearchText(manufacturerTerms),
+    semanticText: normalizeSearchText(semanticTerms),
+    submodelText: normalizeSearchText(submodelTerms),
+    manufacturers: sortSearchValues(manufacturerTerms),
+    semanticIds: sortSearchValues(semanticTerms),
+    submodels: sortSearchValues(submodelTerms),
+  };
+}
+
+function collectRepositoryElementSearch(element, manufacturerTerms) {
+  if (isManufacturerElement(element)) {
+    addSearchValues(manufacturerTerms, [element.value, element.idShort]);
+  }
+  getElementChildren(element).forEach((child) => collectRepositoryElementSearch(child, manufacturerTerms));
+}
+
+function isManufacturerElement(element) {
+  const text = normalizeSearchText([element?.idShort, ...getReferenceValues(element?.semanticId)]);
+  return text.includes("manufacturer") || text.includes("hersteller");
+}
+
+function collectSemanticValues(entity, semanticTerms, visited = new Set()) {
+  if (!entity || typeof entity !== "object" || visited.has(entity)) return;
+  visited.add(entity);
+
+  if (Array.isArray(entity)) {
+    entity.forEach((item) => collectSemanticValues(item, semanticTerms, visited));
+    return;
+  }
+
+  if (entity.semanticId) {
+    addSearchValues(semanticTerms, getReferenceValues(entity.semanticId));
+  }
+
+  Object.values(entity).forEach((value) => collectSemanticValues(value, semanticTerms, visited));
+}
+
+function getReferenceValues(reference) {
+  if (!reference) return [];
+  if (Array.isArray(reference.keys)) return reference.keys.map((key) => key?.value);
+  return [];
+}
+
+function addSearchValues(target, values) {
+  values.flat().forEach((value) => {
+    const text = String(value ?? "").trim();
+    if (text) target.add(text);
+  });
+}
+
+function normalizeSearchText(values) {
+  return [...values]
+    .map((value) => String(value ?? "").trim().toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+}
+
+function sortSearchValues(values) {
+  return [...values].sort((left, right) => left.localeCompare(right));
 }
 
 async function loadRepositoryVersion(assetId, version) {
@@ -842,7 +1255,7 @@ async function readApiResponse(response) {
 function renderRepositoryList(assets) {
   repositoryList.innerHTML = assets.length
     ? assets.map(renderRepositoryCard).join("")
-    : `<div class="repository-card"><h3>Keine AAS gespeichert</h3><div class="repository-meta">Speichere zuerst eine geladene AAS.</div></div>`;
+    : renderRepositoryEmptyState();
 }
 
 function renderRepositoryCard(asset) {
@@ -873,6 +1286,7 @@ function renderRepositoryCard(asset) {
       <h3>${escapeHtml(asset.idShort)}</h3>
       <div class="repository-meta">${escapeHtml(asset.globalAssetId)}</div>
       <div class="repository-meta">Latest Version: ${asset.latestVersion} | Updated: ${formatDateTime(asset.updatedAt)}</div>
+      ${renderRepositorySearchMeta(asset)}
       <div class="version-list">
         ${versions
           .map(
@@ -884,6 +1298,30 @@ function renderRepositoryCard(asset) {
       ${compareControls}
     </article>
   `;
+}
+
+function renderRepositoryEmptyState() {
+  return hasRepositorySearch()
+    ? `<div class="repository-card"><h3>Keine Treffer</h3><div class="repository-meta">Passe die Suchfelder an oder setze die Suche zurueck.</div></div>`
+    : `<div class="repository-card"><h3>Keine AAS gespeichert</h3><div class="repository-meta">Speichere zuerst eine geladene AAS.</div></div>`;
+}
+
+function renderRepositorySearchMeta(asset) {
+  const searchIndex = asset.searchIndex ?? buildRepositorySearchIndex(asset);
+  return `
+    <div class="repository-search-meta">
+      <div><strong>Manufacturer:</strong> ${escapeHtml(formatSearchPreview(searchIndex.manufacturers, "nicht gefunden"))}</div>
+      <div><strong>Submodels:</strong> ${escapeHtml(formatSearchPreview(searchIndex.submodels, "keine Submodels"))}</div>
+      <div><strong>Semantic IDs:</strong> ${escapeHtml(formatSearchPreview(searchIndex.semanticIds, "keine Semantic IDs"))}</div>
+    </div>
+  `;
+}
+
+function formatSearchPreview(values, emptyLabel) {
+  if (!values.length) return emptyLabel;
+  const visibleValues = values.slice(0, 3);
+  const suffix = values.length > visibleValues.length ? ` +${values.length - visibleValues.length} weitere` : "";
+  return `${visibleValues.join(", ")}${suffix}`;
 }
 
 function renderVersionOptions(versions, selectedVersion) {
@@ -1257,6 +1695,7 @@ function openMappingDialog(rows, sourceLabel) {
   if (cleanedRows.length < 2) throw new Error(`${sourceLabel} enthält keine Datenzeilen.`);
 
   pendingTableImport = { rows: cleanedRows };
+  mappingForm.reset();
   const headers = getHeaders(cleanedRows);
   const dataRows = cleanedRows.slice(1, 6);
 
@@ -1321,8 +1760,8 @@ function getHeaders(rows) {
   });
 }
 
-function rowsToAasPackage(rows, mapping = defaultMapping(rows)) {
-  const headers = getHeaders(rows);
+function rowsToAasPackage(rows, mapping = defaultMapping(rows), options = {}) {
+  const batchOptions = normalizeBatchOptions(options);
   const records = rows
     .slice(1)
     .filter((row) => row.some((cell) => String(cell ?? "").trim() !== ""))
@@ -1334,7 +1773,12 @@ function rowsToAasPackage(rows, mapping = defaultMapping(rows)) {
           return [column.key, String(value ?? "").trim()];
         }),
       );
-    });
+    })
+    .filter((record) => !batchOptions.skipEmptyValues || record.value !== "");
+
+  if (records.length === 0) {
+    throw new Error("Keine verwertbaren Datenzeilen gefunden.");
+  }
 
   const missing = targetColumns
     .filter((column) => column.required && !records.every((record) => record[column.key]))
@@ -1344,7 +1788,7 @@ function rowsToAasPackage(rows, mapping = defaultMapping(rows)) {
     throw new Error(`Pflichtwerte fehlen in der Tabelle: ${missing.join(", ")}`);
   }
 
-  return recordsToAasPackage(records, headers);
+  return recordsToAasPackage(records, batchOptions);
 }
 
 function defaultMapping(rows) {
@@ -1352,15 +1796,26 @@ function defaultMapping(rows) {
   return Object.fromEntries(targetColumns.map((column) => [column.key, String(guessColumnIndex(column, headers))]));
 }
 
-function recordsToAasPackage(records) {
+function normalizeBatchOptions(options = {}) {
+  return {
+    assetMode: options.assetMode === "singleAsset" ? "singleAsset" : "byAssetId",
+    duplicateMode: ["skip", "replace"].includes(options.duplicateMode) ? options.duplicateMode : "keep",
+    skipEmptyValues: options.skipEmptyValues === true,
+  };
+}
+
+function recordsToAasPackage(records, options = {}) {
+  const batchOptions = normalizeBatchOptions(options);
+  const firstRecord = records[0] ?? {};
   const shellMap = new Map();
   const submodelMap = new Map();
 
   for (const record of records) {
-    const assetId = record.assetId;
-    const assetName = record.assetName || toIdShort(assetId);
-    const submodelId = record.submodelId;
-    const submodelName = record.submodelName || toIdShort(submodelId);
+    const assetId = batchOptions.assetMode === "singleAsset" ? firstRecord.assetId : record.assetId;
+    const assetName = (batchOptions.assetMode === "singleAsset" ? firstRecord.assetName : record.assetName) || toIdShort(assetId);
+    const submodelName = record.submodelName || toIdShort(record.submodelId);
+    const submodelId =
+      batchOptions.assetMode === "singleAsset" ? `${assetId}:submodel:${toIdShort(submodelName)}` : record.submodelId;
 
     if (!shellMap.has(assetId)) {
       shellMap.set(assetId, {
@@ -1411,7 +1866,15 @@ function recordsToAasPackage(records) {
       ];
     }
 
-    submodel.submodelElements.push(property);
+    const existingPropertyIndex = submodel.submodelElements.findIndex((element) => element.idShort === property.idShort);
+    if (batchOptions.duplicateMode === "skip" && existingPropertyIndex >= 0) {
+      continue;
+    }
+    if (batchOptions.duplicateMode === "replace" && existingPropertyIndex >= 0) {
+      submodel.submodelElements[existingPropertyIndex] = property;
+    } else {
+      submodel.submodelElements.push(property);
+    }
   }
 
   return {

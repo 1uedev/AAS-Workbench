@@ -119,7 +119,22 @@
               <input name="assetName" required placeholder="Pump 001" />
             </label>
           </div>
+          <div class="generator-template-panel">
+            <div class="form-section-title">Submodel Templates</div>
+            <div class="template-controls">
+              <label class="field">
+                <span>Template</span>
+                <select id="submodelTemplateSelect"></select>
+              </label>
+              <button class="secondary-button" id="addTemplateButton" type="button">Template hinzufügen</button>
+            </div>
+            <div id="templatePreview" class="template-preview" aria-live="polite"></div>
+          </div>
           <div class="submodel-builder" id="submodelBuilder"></div>
+          <div class="generator-preview-panel">
+            <div class="form-section-title">Vorschau vor Erzeugung</div>
+            <div id="generatorPreview" class="generator-preview" aria-live="polite"></div>
+          </div>
           <div class="action-row">
             <button class="secondary-button" id="addSubmodelButton" type="button">Submodel hinzufügen</button>
             <button class="primary-button" type="submit">AAS erzeugen</button>
@@ -179,6 +194,30 @@
             <button id="refreshRepositoryButton" class="secondary-button" type="button">Repository aktualisieren</button>
           </div>
         </form>
+        <form id="repositorySearchForm" class="repository-search-panel" aria-label="Repository Suche">
+          <div class="form-section-title">Suche</div>
+          <div class="repository-search-grid">
+            <label class="field">
+              <span>Asset</span>
+              <input id="repositoryAssetSearch" type="search" placeholder="Asset ID, AAS ID oder Name" />
+            </label>
+            <label class="field">
+              <span>Manufacturer</span>
+              <input id="repositoryManufacturerSearch" type="search" placeholder="DMG MORI, ACME ..." />
+            </label>
+            <label class="field">
+              <span>Semantic ID</span>
+              <input id="repositorySemanticSearch" type="search" placeholder="idta/Manufacturer oder IRDI" />
+            </label>
+            <label class="field">
+              <span>Submodel</span>
+              <input id="repositorySubmodelSearch" type="search" placeholder="TechnicalData, Nameplate ..." />
+            </label>
+          </div>
+          <div class="action-row">
+            <button id="clearRepositorySearchButton" class="secondary-button" type="reset">Suche zurücksetzen</button>
+          </div>
+        </form>
         <div id="repositoryStatus" class="summary-text">Backend-Status wird beim Aktualisieren geprüft.</div>
         <div id="repositoryList" class="repository-list"></div>
       </section>
@@ -230,6 +269,27 @@
           <button id="closeMappingButton" class="icon-button" type="button" aria-label="Dialog schliessen">x</button>
         </div>
         <p id="mappingSummary" class="summary-text"></p>
+        <div class="mapping-options" aria-label="Batch-Optionen">
+          <label class="field">
+            <span>Asset Batch</span>
+            <select id="batchAssetMode" name="batchAssetMode">
+              <option value="byAssetId">Nach Asset ID gruppieren</option>
+              <option value="singleAsset">Eine AAS aus erster Datenzeile</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Doppelte Properties</span>
+            <select id="batchDuplicateMode" name="batchDuplicateMode">
+              <option value="keep">Alle behalten</option>
+              <option value="skip">Duplikate überspringen</option>
+              <option value="replace">Letzten Wert übernehmen</option>
+            </select>
+          </label>
+          <label class="checkbox-field">
+            <input id="batchSkipEmptyValues" name="batchSkipEmptyValues" type="checkbox" />
+            <span>Zeilen ohne Value überspringen</span>
+          </label>
+        </div>
         <div id="mappingFields" class="mapping-fields"></div>
         <div class="preview-table-wrap">
           <table id="mappingPreview" class="preview-table"></table>

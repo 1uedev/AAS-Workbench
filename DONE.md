@@ -23,6 +23,12 @@
 - Added Excel `.xlsx` import with mapping dialog.
 - Added manual AAS generator MVP.
 - Replaced the single-property generator with a multi-submodel and multi-property generator.
+- Added reusable generator Submodel templates for Technical Data, Nameplate, Operational Data and Maintenance.
+- Added template preview and live generator preview before creating an AAS.
+- Added richer mapped-table batch generation controls:
+  - Group rows by Asset ID or force one AAS from the first data row
+  - Keep, skip or replace duplicate Properties within a Submodel
+  - Skip rows with empty values
 - Added AAS validator MVP:
   - Package arrays
   - Required IDs
@@ -93,6 +99,11 @@
 - Added traceability events for repository saves.
 - Added Repository UI for saving current AAS and loading stored versions.
 - Added Repository compare view for two AAS versions with added, removed and changed AAS entries.
+- Added Repository search filters for:
+  - Asset ID, AAS ID and asset name
+  - Manufacturer values
+  - Semantic IDs
+  - Submodel IDs and idShorts
 - Added sample CSV data.
 - Replaced the flat Explorer list with expandable tree navigation for AAS, Submodels and nested Submodel Elements.
 - Added side-by-side JSON inspector for the selected Explorer node.
@@ -120,9 +131,12 @@
   - Subpage navigation
   - Import route and drop-zone UI
   - Repository route
+  - Repository search by asset, manufacturer, semantic ID and submodel
   - Repository save and version load
   - Sample loading
   - Manual generator
+  - Generator templates, template preview, live generator preview and valid generated AAS output
+  - Batch generation options for single-AAS grouping, duplicate replacement and empty-value skipping
   - Gateway mapping
   - JSON/AASX export button states
   - AASX export click without console errors
