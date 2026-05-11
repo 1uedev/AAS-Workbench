@@ -118,6 +118,9 @@
   - Broadcasts on OPC UA status/value updates and MQTT subscription/message updates
   - Gateway UI live stream status
   - Recent live values panel for OPC UA reads and MQTT messages
+- Added npm package metadata and installed Gateway adapter dependencies:
+  - `node-opcua`
+  - `mqtt`
 - Added local backend with static file serving and AAS Repository API.
 - Added file-backed repository persistence in `data/repository.json`.
 - Added version history for saved AAS payloads.

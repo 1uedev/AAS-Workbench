@@ -62,6 +62,7 @@ Der Dashboard Builder erstellt Widgets aus den Submodel Elements der aktuell gel
 ## Start
 
 ```bash
+npm install
 node server.js
 ```
 
