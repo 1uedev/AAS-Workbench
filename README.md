@@ -8,7 +8,7 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 - AASX und AAS-JSON per Dateiauswahl oder Drag-and-Drop laden und prüfen
 - AAS manuell ueber einen Multi-Submodel-/Multi-Property-Generator mit Submodel-Templates und Vorschau erzeugen
 - CSV- und Excel-Dateien (`.xlsx`) mit Mapping-Dialog und Batch-Optionen in eine einfache AAS-Struktur umwandeln
-- OPC-UA-Quellen als Gateway-Mapping-Submodel dokumentieren, im Backend speichern und per Service verbinden/lesen; MQTT-Mappings vorbereiten
+- OPC-UA- und MQTT-Quellen als Gateway-Mapping-Submodel dokumentieren, im Backend speichern und per Service verbinden, lesen oder abonnieren
 - AAS versioniert in einem lokalen Repository speichern, laden, vergleichen, nach Asset/Manufacturer/Semantic ID/Submodel durchsuchen und Traceability Events anzeigen
 - AAS-Strukturen gegen zentrale AAS-3.x-Metamodellregeln validieren
 - AAS, Submodels und Submodel Elements per Tree navigieren und durchsuchen
@@ -53,7 +53,7 @@ Die Validierung prueft zentrale AAS-3.x-Regeln: Pflichtfelder, `modelType`, `idS
 
 Der manuelle Generator erstellt aus Asset-Daten, mehreren Submodels und mehreren Properties pro Submodel direkt eine AAS-Umgebung. Wiederverwendbare Submodel-Templates fuer Technical Data, Nameplate, Operational Data und Maintenance koennen eingefuegt und vorab geprueft werden. Eine Live-Vorschau zeigt vor der Erzeugung, welche AAS, Submodels und Properties entstehen.
 
-Das Gateway-Formular ergänzt die aktuell geladene AAS um ein `GatewayMapping`-Submodel. Darin werden Protokoll, Endpoint/Broker, OPC-UA-Node-ID oder MQTT-Topic, Ziel-Property und Sampling-Intervall abgelegt. OPC-UA-Mappings werden zusätzlich im lokalen Backend gespeichert. Wenn `node-opcua` installiert ist, kann der Backend-Service die Verbindung öffnen, Werte lesen und den Status persistieren. MQTT ist aktuell als Mapping vorbereitet und folgt als eigener Backend-Schritt.
+Das Gateway-Formular ergänzt die aktuell geladene AAS um ein `GatewayMapping`-Submodel. Darin werden Protokoll, Endpoint/Broker, OPC-UA-Node-ID oder MQTT-Topic, Ziel-Property und Sampling-Intervall abgelegt. OPC-UA- und MQTT-Mappings werden zusätzlich im lokalen Backend gespeichert. Wenn `node-opcua` installiert ist, kann der Backend-Service OPC-UA-Verbindungen öffnen, Werte lesen und den Status persistieren. Wenn `mqtt` installiert ist, kann der Backend-Service MQTT-Broker verbinden, Topics abonnieren und die letzte empfangene Nachricht speichern.
 
 ## Dashboard Builder
 
@@ -99,10 +99,15 @@ POST /api/opcua/connections
 POST /api/opcua/connections/:id/connect
 POST /api/opcua/connections/:id/read
 POST /api/opcua/connections/:id/disconnect
+GET  /api/mqtt
+GET  /api/mqtt/subscriptions
+POST /api/mqtt/subscriptions
+POST /api/mqtt/subscriptions/:id/connect
+POST /api/mqtt/subscriptions/:id/disconnect
 ```
 
 Die Repository-Daten werden lokal in `data/repository.json` gespeichert. Diese Datei ist absichtlich nicht versioniert.
-Die OPC-UA-Gateway-Konfiguration wird lokal in `data/gateway.json` gespeichert. Diese Datei ist absichtlich nicht versioniert.
+Die Gateway-Konfiguration fuer OPC UA und MQTT wird lokal in `data/gateway.json` gespeichert. Diese Datei ist absichtlich nicht versioniert.
 Im Repository kann ein gespeichertes AAS ueber zwei Versionsauswahlen verglichen werden. Der Compare View zeigt Kennzahlen, Version-Metadaten und strukturelle Unterschiede fuer AAS, Submodels und Submodel Elements.
 Die Repository-Liste kann nach Asset-ID/AAS-ID/Name, Manufacturer-Werten, Semantic IDs und Submodel-ID oder `idShort` gefiltert werden. Dafuer wird die jeweils letzte gespeicherte Version des AAS ausgewertet.
 Die Repository-Rolle steuert den Zugriff: `Viewer` darf laden, vergleichen und Traceability Events ansehen; `Editor` und `Admin` duerfen zusaetzlich neue AAS-Versionen speichern. Die Rolle wird als `X-Workbench-Role` an die API gesendet, und der Server blockiert Schreibzugriffe fuer read-only Rollen.

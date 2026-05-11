@@ -680,6 +680,18 @@ body[data-route="dashboard"] .app-shell {
   background: #fbfcfa;
 }
 
+.gateway-backend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.gateway-backend-section {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
 .gateway-connection-list {
   display: grid;
   gap: 10px;
@@ -1749,6 +1761,7 @@ body[data-route="dashboard"] .app-shell {
   .dashboard-toolbar,
   .repository-access-panel,
   .repository-search-grid,
+  .gateway-backend-grid,
   .template-controls {
     grid-template-columns: 1fr;
   }

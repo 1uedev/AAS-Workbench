@@ -4,12 +4,11 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Build backend service for MQTT subscriptions.
+- [ ] Add unified gateway status across OPC UA and MQTT.
 
 ## Live OPC UA / MQTT Gateway Backend
 
-- [ ] Build backend service for MQTT subscriptions.
-- [ ] Persist MQTT mappings and unified gateway status.
+- [ ] Add unified gateway status across OPC UA and MQTT.
 - [ ] Stream live values into the UI.
 - [ ] Support write-back where safe.
 

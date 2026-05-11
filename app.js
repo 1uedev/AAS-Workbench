@@ -53,6 +53,8 @@ const gatewayForm = document.querySelector("#gatewayForm");
 const gatewayBackendStatus = document.querySelector("#gatewayBackendStatus");
 const refreshGatewayBackendButton = document.querySelector("#refreshGatewayBackendButton");
 const opcUaConnectionList = document.querySelector("#opcUaConnectionList");
+const mqttBackendStatus = document.querySelector("#mqttBackendStatus");
+const mqttSubscriptionList = document.querySelector("#mqttSubscriptionList");
 const repositoryForm = document.querySelector("#repositoryForm");
 const repositoryReason = document.querySelector("#repositoryReason");
 const saveRepositoryButton = document.querySelector("#saveRepositoryButton");
@@ -79,6 +81,7 @@ let gatewayMappingCounter = 1;
 let submodelCounter = 1;
 let propertyCounter = 1;
 let opcUaConnections = [];
+let mqttSubscriptions = [];
 let repositoryAssets = [];
 let explorerNodes = new Map();
 let selectedExplorerNodeId = "package";
@@ -486,7 +489,7 @@ renderTemplatePreview();
 renderGeneratorPreview();
 refreshDashboardCatalog();
 renderDashboard();
-refreshOpcUaConnections();
+refreshGatewayBackends();
 updateTreeControls(false);
 
 fileInput.addEventListener("change", async (event) => {
@@ -770,24 +773,30 @@ gatewayForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (mapping.protocol !== "OPC UA") {
-    gatewayBackendStatus.textContent = "MQTT-Mapping wurde als AAS-Submodel gespeichert. MQTT-Backend folgt in einem separaten Schritt.";
-    return;
-  }
-
   try {
-    await registerOpcUaConnection(mapping);
+    if (mapping.protocol === "MQTT") {
+      await registerMqttSubscription(mapping);
+    } else {
+      await registerOpcUaConnection(mapping);
+    }
   } catch (error) {
-    gatewayBackendStatus.textContent = `OPC UA Backend konnte das Mapping nicht speichern: ${error.message}`;
+    const statusElement = mapping.protocol === "MQTT" ? mqttBackendStatus : gatewayBackendStatus;
+    statusElement.textContent = `${mapping.protocol} Backend konnte das Mapping nicht speichern: ${error.message}`;
   }
 });
 
-refreshGatewayBackendButton.addEventListener("click", refreshOpcUaConnections);
+refreshGatewayBackendButton.addEventListener("click", refreshGatewayBackends);
 
 opcUaConnectionList.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-opcua-action]");
   if (!button) return;
   await runOpcUaConnectionAction(button.dataset.opcuaAction, button.dataset.opcuaConnection);
+});
+
+mqttSubscriptionList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-mqtt-action]");
+  if (!button) return;
+  await runMqttSubscriptionAction(button.dataset.mqttAction, button.dataset.mqttSubscription);
 });
 
 mappingForm.addEventListener("submit", (event) => {
@@ -2157,6 +2166,27 @@ async function registerOpcUaConnection(mapping) {
   gatewayBackendStatus.textContent = `OPC UA Connection gespeichert: ${connection.targetProperty || connection.nodeId}.`;
 }
 
+async function registerMqttSubscription(mapping) {
+  mqttBackendStatus.textContent = "MQTT Subscription wird gespeichert ...";
+  const response = await fetch("/api/mqtt/subscriptions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      brokerUrl: mapping.endpoint,
+      topic: mapping.sourceAddress,
+      targetProperty: mapping.targetProperty,
+      samplingInterval: mapping.samplingInterval,
+    }),
+  });
+  const subscription = await readApiResponse(response);
+  await refreshMqttSubscriptions();
+  mqttBackendStatus.textContent = `MQTT Subscription gespeichert: ${subscription.targetProperty || subscription.topic}.`;
+}
+
+async function refreshGatewayBackends() {
+  await Promise.all([refreshOpcUaConnections(), refreshMqttSubscriptions()]);
+}
+
 async function refreshOpcUaConnections() {
   try {
     const [statusResponse, connectionsResponse] = await Promise.all([
@@ -2173,10 +2203,32 @@ async function refreshOpcUaConnections() {
   }
 }
 
+async function refreshMqttSubscriptions() {
+  try {
+    const [statusResponse, subscriptionsResponse] = await Promise.all([
+      fetch("/api/mqtt"),
+      fetch("/api/mqtt/subscriptions"),
+    ]);
+    const status = await readApiResponse(statusResponse);
+    mqttSubscriptions = await readApiResponse(subscriptionsResponse);
+    mqttBackendStatus.textContent = `${status.status}: ${status.message}`;
+    renderMqttSubscriptions();
+  } catch (error) {
+    mqttBackendStatus.textContent = `MQTT Backend nicht verfuegbar: ${error.message}`;
+    mqttSubscriptionList.innerHTML = "";
+  }
+}
+
 function renderOpcUaConnections() {
   opcUaConnectionList.innerHTML = opcUaConnections.length
     ? opcUaConnections.map(renderOpcUaConnectionCard).join("")
     : `<div class="gateway-connection-card"><h3>Keine OPC UA Connections</h3><div class="gateway-connection-meta">Speichere zuerst ein OPC-UA-Mapping.</div></div>`;
+}
+
+function renderMqttSubscriptions() {
+  mqttSubscriptionList.innerHTML = mqttSubscriptions.length
+    ? mqttSubscriptions.map(renderMqttSubscriptionCard).join("")
+    : `<div class="gateway-connection-card"><h3>Keine MQTT Subscriptions</h3><div class="gateway-connection-meta">Speichere zuerst ein MQTT-Mapping.</div></div>`;
 }
 
 function renderOpcUaConnectionCard(connection) {
@@ -2202,6 +2254,29 @@ function renderOpcUaConnectionCard(connection) {
   `;
 }
 
+function renderMqttSubscriptionCard(subscription) {
+  const status = subscription.runtimeStatus || subscription.status || "configured";
+  const lastMessage = subscription.lastMessage === undefined ? "keine Nachricht" : subscription.lastMessage;
+  const lastMessageAt = subscription.lastMessageAt ? formatDateTime(subscription.lastMessageAt) : "nie";
+  return `
+    <article class="gateway-connection-card">
+      <h3>${escapeHtml(subscription.targetProperty || subscription.topic)}</h3>
+      <div class="gateway-connection-meta">
+        <div>Status: ${escapeHtml(status)}</div>
+        <code>${escapeHtml(subscription.brokerUrl)}</code>
+        <code>${escapeHtml(subscription.topic)}</code>
+        <div>QoS: ${escapeHtml(subscription.qos)} | Last message: ${escapeHtml(lastMessage)} | Received: ${escapeHtml(lastMessageAt)}</div>
+        ${subscription.lastTopic ? `<div>Last topic: ${escapeHtml(subscription.lastTopic)}</div>` : ""}
+        ${subscription.lastError ? `<div>Fehler: ${escapeHtml(subscription.lastError)}</div>` : ""}
+      </div>
+      <div class="action-row">
+        <button class="secondary-button" type="button" data-mqtt-action="connect" data-mqtt-subscription="${escapeHtml(subscription.id)}">Abonnieren</button>
+        <button class="secondary-button" type="button" data-mqtt-action="disconnect" data-mqtt-subscription="${escapeHtml(subscription.id)}">Trennen</button>
+      </div>
+    </article>
+  `;
+}
+
 async function runOpcUaConnectionAction(action, connectionId) {
   if (!connectionId) return;
   const labels = {
@@ -2220,6 +2295,26 @@ async function runOpcUaConnectionAction(action, connectionId) {
     gatewayBackendStatus.textContent = `${result.status}: ${result.lastError || "OPC UA Aktion abgeschlossen."}`;
   } catch (error) {
     gatewayBackendStatus.textContent = `OPC UA Aktion fehlgeschlagen: ${error.message}`;
+  }
+}
+
+async function runMqttSubscriptionAction(action, subscriptionId) {
+  if (!subscriptionId) return;
+  const labels = {
+    connect: "MQTT Subscription wird verbunden ...",
+    disconnect: "MQTT Subscription wird getrennt ...",
+  };
+  mqttBackendStatus.textContent = labels[action] ?? "MQTT Aktion wird ausgefuehrt ...";
+
+  try {
+    const response = await fetch(`/api/mqtt/subscriptions/${encodeURIComponent(subscriptionId)}/${action}`, {
+      method: "POST",
+    });
+    const result = await readApiResponse(response);
+    await refreshMqttSubscriptions();
+    mqttBackendStatus.textContent = `${result.status}: ${result.lastError || "MQTT Aktion abgeschlossen."}`;
+  } catch (error) {
+    mqttBackendStatus.textContent = `MQTT Aktion fehlgeschlagen: ${error.message}`;
   }
 }
 

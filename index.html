@@ -94,8 +94,8 @@
         </a>
         <a class="home-module" href="#gateway">
           <span class="feature-kicker">Gateway</span>
-          <strong>OPC UA / MQTT vorbereiten</strong>
-          <span>Gateway-Mappings als exportierbares AAS-Submodel dokumentieren.</span>
+          <strong>OPC UA / MQTT verbinden</strong>
+          <span>Gateway-Mappings dokumentieren und Backend-Verbindungen verwalten.</span>
         </a>
       </section>
     </main>
@@ -214,12 +214,22 @@
           </div>
         </form>
         <div class="gateway-backend-panel">
-          <div class="form-section-title">OPC UA Backend</div>
-          <div id="gatewayBackendStatus" class="summary-text">Backend-Status wird geladen ...</div>
+          <div class="form-section-title">Gateway Backend</div>
           <div class="action-row">
             <button id="refreshGatewayBackendButton" class="secondary-button" type="button">Backend aktualisieren</button>
           </div>
-          <div id="opcUaConnectionList" class="gateway-connection-list"></div>
+          <div class="gateway-backend-grid">
+            <section class="gateway-backend-section">
+              <div class="form-section-title">OPC UA</div>
+              <div id="gatewayBackendStatus" class="summary-text">OPC-UA-Status wird geladen ...</div>
+              <div id="opcUaConnectionList" class="gateway-connection-list"></div>
+            </section>
+            <section class="gateway-backend-section">
+              <div class="form-section-title">MQTT</div>
+              <div id="mqttBackendStatus" class="summary-text">MQTT-Status wird geladen ...</div>
+              <div id="mqttSubscriptionList" class="gateway-connection-list"></div>
+            </section>
+          </div>
         </div>
       </section>
 

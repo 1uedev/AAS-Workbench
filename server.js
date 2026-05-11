@@ -12,6 +12,7 @@ const port = Number(process.env.PORT || 8081);
 const writeRoles = new Set(["editor", "admin"]);
 const repositoryRoles = new Set(["viewer", "editor", "admin"]);
 const opcUaRuntimeConnections = new Map();
+const mqttRuntimeSubscriptions = new Map();
 
 const contentTypes = {
   ".aasx": "application/asset-administration-shell-package",
@@ -54,6 +55,11 @@ async function handleApi(request, response, url) {
 
   if (parts[1] === "opcua") {
     await handleOpcUaApi(request, response, parts);
+    return;
+  }
+
+  if (parts[1] === "mqtt") {
+    await handleMqttApi(request, response, parts);
     return;
   }
 
@@ -287,6 +293,249 @@ function loadOpcUaAdapter() {
   }
 }
 
+async function handleMqttApi(request, response, parts) {
+  if (request.method === "GET" && parts.length === 2) {
+    sendJson(response, 200, getMqttServiceStatus());
+    return;
+  }
+
+  if (request.method === "GET" && parts.length === 3 && parts[2] === "subscriptions") {
+    sendJson(response, 200, listMqttSubscriptions());
+    return;
+  }
+
+  if (request.method === "POST" && parts.length === 3 && parts[2] === "subscriptions") {
+    sendJson(response, 201, saveMqttSubscription(await readJsonBody(request)));
+    return;
+  }
+
+  const subscriptionId = parts[3];
+  if (!subscriptionId || parts[2] !== "subscriptions") {
+    sendJson(response, 404, { error: "MQTT route not found" });
+    return;
+  }
+
+  if (request.method === "POST" && parts.length === 5 && parts[4] === "connect") {
+    sendJson(response, 200, await connectMqttSubscription(subscriptionId));
+    return;
+  }
+
+  if (request.method === "POST" && parts.length === 5 && parts[4] === "disconnect") {
+    sendJson(response, 200, await disconnectMqttSubscription(subscriptionId));
+    return;
+  }
+
+  sendJson(response, 404, { error: "MQTT route not found" });
+}
+
+function getMqttServiceStatus() {
+  const adapter = loadMqttAdapter();
+  return {
+    service: "mqtt",
+    status: adapter.available ? "ready" : "adapter_unavailable",
+    adapter: adapter.available ? "mqtt" : "not installed",
+    subscriptions: listMqttSubscriptions().length,
+    message: adapter.available
+      ? "MQTT backend service is ready."
+      : "Install mqtt to enable live MQTT subscriptions. Configuration persistence is available.",
+  };
+}
+
+function listMqttSubscriptions() {
+  return readGatewayStore().mqttSubscriptions.map((subscription) => ({
+    ...subscription,
+    runtimeStatus: mqttRuntimeSubscriptions.has(subscription.id) ? "connected" : subscription.status,
+  }));
+}
+
+function saveMqttSubscription(body) {
+  const brokerUrl = String(body.brokerUrl ?? body.endpoint ?? "").trim();
+  const topic = String(body.topic ?? body.sourceAddress ?? "").trim();
+  const targetProperty = String(body.targetProperty ?? "").trim();
+  const samplingInterval = Number(body.samplingInterval || 1000);
+  const qos = Number(body.qos ?? 0);
+
+  if (!["mqtt://", "mqtts://", "ws://", "wss://"].some((prefix) => brokerUrl.startsWith(prefix))) {
+    const error = new Error("MQTT broker URL must start with mqtt://, mqtts://, ws:// or wss://");
+    error.status = 400;
+    throw error;
+  }
+
+  if (!topic) {
+    const error = new Error("MQTT topic is required");
+    error.status = 400;
+    throw error;
+  }
+
+  const store = readGatewayStore();
+  const now = new Date().toISOString();
+  const existing = store.mqttSubscriptions.find(
+    (subscription) =>
+      subscription.brokerUrl === brokerUrl && subscription.topic === topic && subscription.targetProperty === targetProperty,
+  );
+  const subscription = existing ?? {
+    id: crypto.randomUUID(),
+    createdAt: now,
+    status: "configured",
+  };
+
+  Object.assign(subscription, {
+    brokerUrl,
+    topic,
+    targetProperty,
+    samplingInterval: Number.isFinite(samplingInterval) ? samplingInterval : 1000,
+    qos: [0, 1, 2].includes(qos) ? qos : 0,
+    updatedAt: now,
+    lastError: "",
+  });
+
+  if (!existing) store.mqttSubscriptions.push(subscription);
+  writeGatewayStore(store);
+  return subscription;
+}
+
+async function connectMqttSubscription(subscriptionId) {
+  const subscription = findMqttSubscription(subscriptionId);
+  const adapter = loadMqttAdapter();
+  if (!adapter.available) return updateMqttSubscriptionStatus(subscriptionId, "adapter_unavailable", adapter.error.message);
+
+  const existingRuntime = mqttRuntimeSubscriptions.get(subscriptionId);
+  if (existingRuntime) return updateMqttSubscriptionStatus(subscriptionId, "connected", "");
+
+  let client;
+  try {
+    client = adapter.module.connect(subscription.brokerUrl, {
+      connectTimeout: 7000,
+      reconnectPeriod: 0,
+    });
+    await waitForMqttConnect(client);
+    await subscribeMqttTopic(client, subscription);
+    mqttRuntimeSubscriptions.set(subscriptionId, { client, connectedAt: new Date().toISOString() });
+    attachMqttRuntimeHandlers(subscriptionId, client);
+    return updateMqttSubscriptionStatus(subscriptionId, "connected", "");
+  } catch (error) {
+    if (client) {
+      try {
+        client.end(true);
+      } catch {
+        // Closing a failed MQTT client is best-effort cleanup.
+      }
+    }
+    mqttRuntimeSubscriptions.delete(subscriptionId);
+    return updateMqttSubscriptionStatus(subscriptionId, "error", error.message);
+  }
+}
+
+async function disconnectMqttSubscription(subscriptionId) {
+  const runtime = mqttRuntimeSubscriptions.get(subscriptionId);
+  if (runtime) {
+    mqttRuntimeSubscriptions.delete(subscriptionId);
+    try {
+      await endMqttClient(runtime.client);
+    } catch {
+      // Runtime cleanup should not hide the requested disconnected state.
+    }
+  }
+  return updateMqttSubscriptionStatus(subscriptionId, "disconnected", "");
+}
+
+function waitForMqttConnect(client) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => finish(new Error("MQTT connect timeout")), 8000);
+
+    function finish(error) {
+      clearTimeout(timeout);
+      client.off("connect", onConnect);
+      client.off("error", onError);
+      if (error) reject(error);
+      else resolve();
+    }
+
+    function onConnect() {
+      finish();
+    }
+
+    function onError(error) {
+      finish(error);
+    }
+
+    client.once("connect", onConnect);
+    client.once("error", onError);
+  });
+}
+
+function subscribeMqttTopic(client, subscription) {
+  return new Promise((resolve, reject) => {
+    client.subscribe(subscription.topic, { qos: subscription.qos }, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
+function endMqttClient(client) {
+  return new Promise((resolve) => {
+    client.end(true, {}, resolve);
+  });
+}
+
+function attachMqttRuntimeHandlers(subscriptionId, client) {
+  client.on("message", (topic, message) => {
+    try {
+      updateMqttSubscriptionStatus(subscriptionId, "connected", "", message.toString("utf8"), topic);
+    } catch {
+      // Runtime event handlers should not crash the server for stale subscriptions.
+    }
+  });
+
+  client.on("error", (error) => {
+    try {
+      updateMqttSubscriptionStatus(subscriptionId, "error", error.message);
+    } catch {
+      // Runtime event handlers should not crash the server for stale subscriptions.
+    }
+  });
+
+  client.on("close", () => {
+    const runtime = mqttRuntimeSubscriptions.get(subscriptionId);
+    if (runtime?.client !== client) return;
+    mqttRuntimeSubscriptions.delete(subscriptionId);
+    try {
+      updateMqttSubscriptionStatus(subscriptionId, "disconnected", "");
+    } catch {
+      // Runtime event handlers should not crash the server for stale subscriptions.
+    }
+  });
+}
+
+function updateMqttSubscriptionStatus(subscriptionId, status, errorMessage = "", message, topic) {
+  const store = readGatewayStore();
+  const subscription = store.mqttSubscriptions.find((candidate) => candidate.id === subscriptionId);
+  if (!subscription) throw notFound("MQTT subscription not found");
+  subscription.status = status;
+  subscription.lastError = errorMessage;
+  subscription.lastMessageAt = message === undefined ? subscription.lastMessageAt : new Date().toISOString();
+  subscription.lastMessage = message === undefined ? subscription.lastMessage : String(message);
+  subscription.lastTopic = topic === undefined ? subscription.lastTopic : String(topic);
+  subscription.updatedAt = new Date().toISOString();
+  writeGatewayStore(store);
+  return subscription;
+}
+
+function findMqttSubscription(subscriptionId) {
+  const subscription = readGatewayStore().mqttSubscriptions.find((candidate) => candidate.id === subscriptionId);
+  if (!subscription) throw notFound("MQTT subscription not found");
+  return subscription;
+}
+
+function loadMqttAdapter() {
+  try {
+    return { available: true, module: require("mqtt") };
+  } catch (error) {
+    return { available: false, error };
+  }
+}
+
 function saveAasVersion(body, role = "editor") {
   const payload = body?.payload;
   if (!payload?.assetAdministrationShells?.length) {
@@ -443,7 +692,7 @@ function ensureRepository() {
 function ensureGatewayStore() {
   fs.mkdirSync(dataDir, { recursive: true });
   if (!fs.existsSync(gatewayPath)) {
-    writeGatewayStore({ opcuaConnections: [] });
+    writeGatewayStore({ opcuaConnections: [], mqttSubscriptions: [] });
   }
 }
 
@@ -461,6 +710,7 @@ function readGatewayStore() {
   const store = JSON.parse(fs.readFileSync(gatewayPath, "utf8"));
   return {
     opcuaConnections: Array.isArray(store.opcuaConnections) ? store.opcuaConnections : [],
+    mqttSubscriptions: Array.isArray(store.mqttSubscriptions) ? store.mqttSubscriptions : [],
   };
 }
 
