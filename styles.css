@@ -680,6 +680,61 @@ body[data-route="dashboard"] .app-shell {
   background: #fbfcfa;
 }
 
+.gateway-status-summary {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e8ede8;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.gateway-status-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.gateway-status-heading strong {
+  font-size: 16px;
+  text-transform: capitalize;
+}
+
+.gateway-status-heading span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.gateway-status-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(90px, 1fr));
+  gap: 8px;
+}
+
+.gateway-status-metrics div {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f5f8f5;
+}
+
+.gateway-status-metrics strong {
+  font-size: 17px;
+}
+
+.gateway-status-metrics span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.gateway-protocol-summary {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .gateway-backend-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(220px, 1fr));
@@ -1762,6 +1817,7 @@ body[data-route="dashboard"] .app-shell {
   .repository-access-panel,
   .repository-search-grid,
   .gateway-backend-grid,
+  .gateway-status-metrics,
   .template-controls {
     grid-template-columns: 1fr;
   }

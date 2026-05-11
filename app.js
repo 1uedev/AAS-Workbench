@@ -50,6 +50,7 @@ const clearDashboardLayoutButton = document.querySelector("#clearDashboardLayout
 const dashboardStatus = document.querySelector("#dashboardStatus");
 const dashboardGrid = document.querySelector("#dashboardGrid");
 const gatewayForm = document.querySelector("#gatewayForm");
+const gatewayUnifiedStatus = document.querySelector("#gatewayUnifiedStatus");
 const gatewayBackendStatus = document.querySelector("#gatewayBackendStatus");
 const refreshGatewayBackendButton = document.querySelector("#refreshGatewayBackendButton");
 const opcUaConnectionList = document.querySelector("#opcUaConnectionList");
@@ -80,6 +81,7 @@ let pendingTableImport = null;
 let gatewayMappingCounter = 1;
 let submodelCounter = 1;
 let propertyCounter = 1;
+let gatewayStatus = null;
 let opcUaConnections = [];
 let mqttSubscriptions = [];
 let repositoryAssets = [];
@@ -2162,7 +2164,7 @@ async function registerOpcUaConnection(mapping) {
     }),
   });
   const connection = await readApiResponse(response);
-  await refreshOpcUaConnections();
+  await refreshGatewayBackends();
   gatewayBackendStatus.textContent = `OPC UA Connection gespeichert: ${connection.targetProperty || connection.nodeId}.`;
 }
 
@@ -2179,12 +2181,48 @@ async function registerMqttSubscription(mapping) {
     }),
   });
   const subscription = await readApiResponse(response);
-  await refreshMqttSubscriptions();
+  await refreshGatewayBackends();
   mqttBackendStatus.textContent = `MQTT Subscription gespeichert: ${subscription.targetProperty || subscription.topic}.`;
 }
 
 async function refreshGatewayBackends() {
-  await Promise.all([refreshOpcUaConnections(), refreshMqttSubscriptions()]);
+  await Promise.all([refreshGatewayStatus(), refreshOpcUaConnections(), refreshMqttSubscriptions()]);
+}
+
+async function refreshGatewayStatus() {
+  try {
+    const response = await fetch("/api/gateway");
+    gatewayStatus = await readApiResponse(response);
+    renderGatewayStatus();
+  } catch (error) {
+    gatewayUnifiedStatus.innerHTML = `
+      <div class="gateway-status-heading">
+        <strong>Nicht verfuegbar</strong>
+        <span>Gateway-Status konnte nicht geladen werden: ${escapeHtml(error.message)}</span>
+      </div>
+    `;
+  }
+}
+
+function renderGatewayStatus() {
+  const totals = gatewayStatus?.totals ?? {};
+  const protocols = gatewayStatus?.protocols ?? {};
+  gatewayUnifiedStatus.innerHTML = `
+    <div class="gateway-status-heading">
+      <strong>${escapeHtml(gatewayStatus?.status ?? "unbekannt")}</strong>
+      <span>${escapeHtml(gatewayStatus?.message ?? "Gateway-Status konnte nicht gelesen werden.")}</span>
+    </div>
+    <div class="gateway-status-metrics" aria-label="Gateway Kennzahlen">
+      <div><strong>${escapeHtml(totals.mappings ?? 0)}</strong><span>Mappings</span></div>
+      <div><strong>${escapeHtml(totals.active ?? 0)}</strong><span>Aktiv</span></div>
+      <div><strong>${escapeHtml(totals.attention ?? 0)}</strong><span>Pruefen</span></div>
+      <div><strong>${escapeHtml(totals.disconnected ?? 0)}</strong><span>Getrennt</span></div>
+    </div>
+    <div class="gateway-protocol-summary">
+      <div>OPC UA: ${escapeHtml(protocols.opcua?.mappings ?? 0)} Mappings | Adapter: ${escapeHtml(protocols.opcua?.adapter ?? "unbekannt")}</div>
+      <div>MQTT: ${escapeHtml(protocols.mqtt?.mappings ?? 0)} Mappings | Adapter: ${escapeHtml(protocols.mqtt?.adapter ?? "unbekannt")}</div>
+    </div>
+  `;
 }
 
 async function refreshOpcUaConnections() {
@@ -2291,7 +2329,7 @@ async function runOpcUaConnectionAction(action, connectionId) {
       method: "POST",
     });
     const result = await readApiResponse(response);
-    await refreshOpcUaConnections();
+    await refreshGatewayBackends();
     gatewayBackendStatus.textContent = `${result.status}: ${result.lastError || "OPC UA Aktion abgeschlossen."}`;
   } catch (error) {
     gatewayBackendStatus.textContent = `OPC UA Aktion fehlgeschlagen: ${error.message}`;
@@ -2311,7 +2349,7 @@ async function runMqttSubscriptionAction(action, subscriptionId) {
       method: "POST",
     });
     const result = await readApiResponse(response);
-    await refreshMqttSubscriptions();
+    await refreshGatewayBackends();
     mqttBackendStatus.textContent = `${result.status}: ${result.lastError || "MQTT Aktion abgeschlossen."}`;
   } catch (error) {
     mqttBackendStatus.textContent = `MQTT Aktion fehlgeschlagen: ${error.message}`;

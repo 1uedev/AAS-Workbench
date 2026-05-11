@@ -108,6 +108,11 @@
   - Gateway UI status panel with per-subscription actions
   - Last message metadata persistence for live MQTT subscriptions
   - Graceful `mqtt` adapter-unavailable state when the optional dependency is not installed
+- Added unified Gateway backend status:
+  - `/api/gateway` summary across OPC UA and MQTT
+  - Combined mapping, active, disconnected and attention counters
+  - Per-protocol adapter and runtime summaries
+  - Gateway UI summary panel refreshed with backend actions
 - Added local backend with static file serving and AAS Repository API.
 - Added file-backed repository persistence in `data/repository.json`.
 - Added version history for saved AAS payloads.
@@ -170,6 +175,7 @@
   - OPC UA connection register/list/connect/read API smoke test
   - MQTT backend status, subscription persistence and adapter-unavailable UI path
   - MQTT subscription register/list/connect/disconnect API smoke test
+  - Unified Gateway status API and UI summary on the Gateway route
   - JSON/AASX export button states
   - AASX export click without console errors
   - Explorer tree expansion, node selection and JSON inspector updates

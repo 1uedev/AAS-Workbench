@@ -53,6 +53,11 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (parts[1] === "gateway") {
+    handleGatewayApi(request, response, parts);
+    return;
+  }
+
   if (parts[1] === "opcua") {
     await handleOpcUaApi(request, response, parts);
     return;
@@ -107,6 +112,140 @@ async function handleApi(request, response, url) {
   }
 
   sendJson(response, 404, { error: "API route not found" });
+}
+
+function handleGatewayApi(request, response, parts) {
+  if (request.method === "GET" && parts.length === 2) {
+    sendJson(response, 200, getGatewayServiceStatus());
+    return;
+  }
+
+  sendJson(response, 404, { error: "Gateway route not found" });
+}
+
+function getGatewayServiceStatus() {
+  const opcua = getOpcUaServiceStatus();
+  const mqtt = getMqttServiceStatus();
+  const opcuaConnections = listOpcUaConnections();
+  const mqttSubscriptions = listMqttSubscriptions();
+  const opcuaRuntime = summarizeGatewayItems(opcuaConnections);
+  const mqttRuntime = summarizeGatewayItems(mqttSubscriptions);
+  const runtime = mergeGatewaySummaries([opcuaRuntime, mqttRuntime]);
+  const missingAdapters = [
+    opcua.adapter === "not installed" ? "OPC UA" : "",
+    mqtt.adapter === "not installed" ? "MQTT" : "",
+  ].filter(Boolean);
+
+  return {
+    service: "gateway",
+    status: deriveGatewayStatus(runtime),
+    updatedAt: new Date().toISOString(),
+    message: buildGatewayStatusMessage(runtime, missingAdapters),
+    totals: {
+      mappings: runtime.total,
+      active: runtime.connected,
+      attention: runtime.attention,
+      configured: runtime.configured,
+      disconnected: runtime.disconnected,
+    },
+    protocols: {
+      opcua: {
+        adapter: opcua.adapter,
+        status: opcua.status,
+        mappings: opcuaConnections.length,
+        runtime: opcuaRuntime,
+      },
+      mqtt: {
+        adapter: mqtt.adapter,
+        status: mqtt.status,
+        mappings: mqttSubscriptions.length,
+        runtime: mqttRuntime,
+      },
+    },
+    recentValues: [
+      ...opcuaConnections
+        .filter((connection) => connection.lastValue !== undefined)
+        .map((connection) => ({
+          protocol: "OPC UA",
+          label: connection.targetProperty || connection.nodeId,
+          source: connection.nodeId,
+          value: connection.lastValue,
+          receivedAt: connection.lastReadAt || "",
+        })),
+      ...mqttSubscriptions
+        .filter((subscription) => subscription.lastMessage !== undefined)
+        .map((subscription) => ({
+          protocol: "MQTT",
+          label: subscription.targetProperty || subscription.topic,
+          source: subscription.lastTopic || subscription.topic,
+          value: subscription.lastMessage,
+          receivedAt: subscription.lastMessageAt || "",
+        })),
+    ]
+      .sort((a, b) => String(b.receivedAt).localeCompare(String(a.receivedAt)))
+      .slice(0, 5),
+  };
+}
+
+function summarizeGatewayItems(items) {
+  return items.reduce(
+    (summary, item) => {
+      const status = item.runtimeStatus || item.status || "configured";
+      summary.total += 1;
+      summary.byStatus[status] = (summary.byStatus[status] || 0) + 1;
+      if (status === "connected") summary.connected += 1;
+      if (status === "configured") summary.configured += 1;
+      if (status === "disconnected") summary.disconnected += 1;
+      if (status === "error" || status === "adapter_unavailable") summary.attention += 1;
+      return summary;
+    },
+    {
+      total: 0,
+      connected: 0,
+      configured: 0,
+      disconnected: 0,
+      attention: 0,
+      byStatus: {},
+    },
+  );
+}
+
+function mergeGatewaySummaries(summaries) {
+  return summaries.reduce(
+    (merged, summary) => {
+      for (const key of ["total", "connected", "configured", "disconnected", "attention"]) {
+        merged[key] += summary[key] || 0;
+      }
+      for (const [status, count] of Object.entries(summary.byStatus)) {
+        merged.byStatus[status] = (merged.byStatus[status] || 0) + count;
+      }
+      return merged;
+    },
+    {
+      total: 0,
+      connected: 0,
+      configured: 0,
+      disconnected: 0,
+      attention: 0,
+      byStatus: {},
+    },
+  );
+}
+
+function deriveGatewayStatus(runtime) {
+  if (runtime.total === 0) return "empty";
+  if (runtime.connected === runtime.total) return "connected";
+  if (runtime.connected > 0 && runtime.attention > 0) return "degraded";
+  if (runtime.connected > 0) return "partial";
+  if (runtime.attention > 0) return "attention";
+  return "configured";
+}
+
+function buildGatewayStatusMessage(runtime, missingAdapters) {
+  if (runtime.total === 0) return "No gateway mappings are configured yet.";
+  const base = `${runtime.total} mappings configured, ${runtime.connected} active, ${runtime.attention} need attention.`;
+  if (missingAdapters.length === 0) return base;
+  return `${base} Missing optional adapters: ${missingAdapters.join(", ")}.`;
 }
 
 async function handleOpcUaApi(request, response, parts) {

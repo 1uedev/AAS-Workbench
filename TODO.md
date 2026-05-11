@@ -4,11 +4,10 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add unified gateway status across OPC UA and MQTT.
+- [ ] Stream live values into the UI.
 
 ## Live OPC UA / MQTT Gateway Backend
 
-- [ ] Add unified gateway status across OPC UA and MQTT.
 - [ ] Stream live values into the UI.
 - [ ] Support write-back where safe.
 
