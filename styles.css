@@ -1673,7 +1673,8 @@ body[data-route="dashboard"] .app-shell {
   overflow-wrap: anywhere;
 }
 
-.json-inspector pre {
+.json-inspector pre,
+.json-editor {
   margin: 0;
   min-height: 320px;
   max-height: calc(100vh - 374px);
@@ -1686,6 +1687,59 @@ body[data-route="dashboard"] .app-shell {
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.json-editor {
+  width: 100%;
+  border: 0;
+  outline: none;
+  resize: vertical;
+}
+
+.json-editor-actions,
+.correction-actions,
+.issue-fixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.json-editor-actions {
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  background: #f7faf7;
+}
+
+.json-inspector-status {
+  min-height: 20px;
+  padding: 8px 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.json-inspector-status.success {
+  color: var(--brand-dark);
+}
+
+.json-inspector-status.error {
+  color: #ad342d;
+}
+
+.correction-suggestions {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.correction-title {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.issue-fixes {
+  margin-top: 4px;
 }
 
 .mapping-dialog {

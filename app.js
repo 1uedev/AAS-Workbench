@@ -25,6 +25,13 @@ const jsonInspectorTitle = document.querySelector("#jsonInspectorTitle");
 const jsonInspectorMeta = document.querySelector("#jsonInspectorMeta");
 const jsonInspectorContent = document.querySelector("#jsonInspectorContent");
 const copyJsonButton = document.querySelector("#copyJsonButton");
+const editJsonButton = document.querySelector("#editJsonButton");
+const jsonInspectorEditor = document.querySelector("#jsonInspectorEditor");
+const jsonEditorActions = document.querySelector("#jsonEditorActions");
+const saveJsonEditButton = document.querySelector("#saveJsonEditButton");
+const cancelJsonEditButton = document.querySelector("#cancelJsonEditButton");
+const jsonInspectorStatus = document.querySelector("#jsonInspectorStatus");
+const jsonCorrectionSuggestions = document.querySelector("#jsonCorrectionSuggestions");
 const mappingDialog = document.querySelector("#mappingDialog");
 const mappingForm = document.querySelector("#mappingForm");
 const mappingFields = document.querySelector("#mappingFields");
@@ -95,6 +102,8 @@ let restEndpoints = [];
 let repositoryAssets = [];
 let explorerNodes = new Map();
 let selectedExplorerNodeId = "package";
+let explorerEditMode = false;
+let explorerEditDraft = "";
 let expandedExplorerNodeIds = new Set(["package"]);
 let lastExplorerQuery = "";
 let selectedRepositoryEventAssetId = "";
@@ -646,6 +655,7 @@ explorer.addEventListener("click", (event) => {
 
   const selectButton = event.target.closest("[data-node-id]");
   if (!selectButton) return;
+  exitJsonEditMode();
   selectedExplorerNodeId = selectButton.dataset.nodeId;
   renderExplorer(currentPackage, searchInput.value);
 });
@@ -678,6 +688,55 @@ copyJsonButton.addEventListener("click", async () => {
   window.setTimeout(() => {
     copyJsonButton.textContent = originalText;
   }, 1200);
+});
+
+editJsonButton.addEventListener("click", () => {
+  const node = explorerNodes.get(selectedExplorerNodeId);
+  if (!node || !isExplorerNodeEditable(node)) return;
+  explorerEditMode = true;
+  explorerEditDraft = JSON.stringify(node.value, null, 2);
+  renderJsonInspector();
+});
+
+jsonInspectorEditor.addEventListener("input", () => {
+  explorerEditDraft = jsonInspectorEditor.value;
+});
+
+cancelJsonEditButton.addEventListener("click", () => {
+  exitJsonEditMode();
+  renderJsonInspector();
+});
+
+saveJsonEditButton.addEventListener("click", () => {
+  try {
+    applyJsonInspectorEdit();
+  } catch (error) {
+    jsonInspectorStatus.className = "json-inspector-status error";
+    jsonInspectorStatus.textContent = error.message;
+  }
+});
+
+jsonCorrectionSuggestions.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-correction-action]");
+  if (!button) return;
+  try {
+    applyInspectorCorrection(button.dataset.correctionAction);
+  } catch (error) {
+    jsonInspectorStatus.className = "json-inspector-status error";
+    jsonInspectorStatus.textContent = error.message;
+  }
+});
+
+issuesList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-issue-fix]");
+  if (!button) return;
+  const issue = currentValidationReport?.issues?.[Number(button.dataset.issueIndex)];
+  if (!issue) return;
+  try {
+    applyIssueFix(issue, button.dataset.issueFix);
+  } catch (error) {
+    summaryText.textContent = `Korrektur konnte nicht angewendet werden: ${error.message}`;
+  }
 });
 
 window.addEventListener("beforeunload", () => {
@@ -1442,6 +1501,7 @@ function loadPackage(aasPackage) {
 
 function resetExplorerState() {
   selectedExplorerNodeId = "package";
+  exitJsonEditMode();
   expandedExplorerNodeIds = new Set(["package"]);
   explorerNodes = new Map();
   lastExplorerQuery = "";
@@ -4408,7 +4468,8 @@ function renderIssueCategorySummary(issues) {
     .join("");
 }
 
-function renderIssueCard(issue) {
+function renderIssueCard(issue, issueIndex) {
+  const fixes = getIssueFixes(issue);
   return `
     <div class="issue ${getIssueLevelClass(issue.level)}">
       <div class="issue-meta">
@@ -4417,8 +4478,94 @@ function renderIssueCard(issue) {
       </div>
       <strong>${escapeHtml(issue.title)}</strong>
       <span>${escapeHtml(issue.message)}</span>
+      ${
+        fixes.length
+          ? `<div class="issue-fixes">${fixes
+              .map(
+                (fix) =>
+                  `<button class="secondary-button" type="button" data-issue-index="${issueIndex}" data-issue-fix="${escapeHtml(fix.action)}">${escapeHtml(fix.label)}</button>`,
+              )
+              .join("")}</div>`
+          : ""
+      }
     </div>
   `;
+}
+
+function getIssueFixes(issue) {
+  const title = issue.title ?? "";
+  const message = issue.message ?? "";
+  const normalized = `${title} ${message}`.toLowerCase();
+  const fixes = [];
+
+  if (
+    title.includes(".submodels[") &&
+    (normalized.includes("modelreference") || normalized.includes("externalreference") || normalized.includes("submodel"))
+  ) {
+    fixes.push({ action: "repair-submodel-reference", label: "Submodel-Referenz korrigieren" });
+  }
+
+  if (normalized.includes("reference.type") && normalized.includes("modelreference")) {
+    fixes.push({ action: "set-model-reference", label: "Reference.type setzen" });
+  }
+
+  if (normalized.includes("fuehrende") || normalized.includes("führende") || normalized.includes("folgende")) {
+    fixes.push({ action: "trim-value", label: "Leerzeichen entfernen" });
+  }
+
+  if (normalized.includes("unit-qualifier sollte valuetype xs:string")) {
+    fixes.push({ action: "unit-value-type-string", label: "Unit valueType korrigieren" });
+  }
+
+  if (normalized.includes("semanticid fehlt")) {
+    fixes.push({ action: "add-semantic-id", label: "semanticId-Vorschlag setzen" });
+  }
+
+  return fixes.filter((fix, index) => fixes.findIndex((candidate) => candidate.action === fix.action) === index);
+}
+
+function applyIssueFix(issue, action) {
+  if (!currentPackage) throw new Error("Keine AAS geladen.");
+
+  if (action === "repair-submodel-reference") {
+    const reference = findReferenceForIssuePath(issue.title);
+    if (!reference) throw new Error("Referenz konnte nicht gefunden werden.");
+    repairSubmodelReference(reference);
+    refreshAfterPackageMutation("Submodel-Referenz korrigiert.");
+    return;
+  }
+
+  if (action === "set-model-reference") {
+    const reference = findReferenceForIssuePath(issue.title);
+    if (!reference) throw new Error("Referenz konnte nicht gefunden werden.");
+    reference.type = "ModelReference";
+    refreshAfterPackageMutation("Reference.type korrigiert.");
+    return;
+  }
+
+  if (action === "trim-value") {
+    const tokens = parseAasPath(issue.title);
+    const value = getPathValue(currentPackage, tokens);
+    if (typeof value !== "string") throw new Error("Wert ist kein String.");
+    setPathValue(currentPackage, tokens, value.trim());
+    refreshAfterPackageMutation("Leerzeichen entfernt.");
+    return;
+  }
+
+  if (action === "unit-value-type-string") {
+    setPathValue(currentPackage, parseAasPath(issue.title), "xs:string");
+    refreshAfterPackageMutation("Unit valueType korrigiert.");
+    return;
+  }
+
+  if (action === "add-semantic-id") {
+    const target = getPathValue(currentPackage, parseAasPath(issue.title));
+    addSemanticIdSuggestion(target);
+    refreshAfterPackageMutation("semanticId-Vorschlag gesetzt.");
+    return;
+  }
+
+  throw new Error("Unbekannte Korrektur.");
 }
 
 function countIssuesByCategory(issues) {
@@ -4717,18 +4864,222 @@ function renderTreeNode(node, depth, forceExpanded) {
 function renderJsonInspector() {
   const node = explorerNodes.get(selectedExplorerNodeId);
   if (!node) {
+    exitJsonEditMode();
     jsonInspectorTitle.textContent = "Keine Auswahl";
     jsonInspectorMeta.textContent = "Keine passenden Daten im aktuellen Filter.";
     jsonInspectorContent.textContent = "Keine Daten geladen.";
+    jsonInspectorEditor.value = "";
+    jsonInspectorEditor.hidden = true;
+    jsonInspectorContent.hidden = false;
+    jsonEditorActions.hidden = true;
+    jsonInspectorStatus.textContent = "";
+    jsonInspectorStatus.className = "json-inspector-status";
+    jsonCorrectionSuggestions.innerHTML = "";
     copyJsonButton.disabled = true;
+    editJsonButton.disabled = true;
     return;
   }
 
   const childLabel = node.children.length === 1 ? "1 Unterknoten" : `${node.children.length} Unterknoten`;
+  const canEdit = isExplorerNodeEditable(node);
   jsonInspectorTitle.textContent = node.label;
   jsonInspectorMeta.textContent = [node.kind, node.meta, childLabel].filter(Boolean).join(" | ");
   jsonInspectorContent.textContent = JSON.stringify(node.value, null, 2);
+  jsonInspectorContent.hidden = explorerEditMode;
+  jsonInspectorEditor.hidden = !explorerEditMode;
+  jsonEditorActions.hidden = !explorerEditMode;
+  if (explorerEditMode) jsonInspectorEditor.value = explorerEditDraft;
   copyJsonButton.disabled = false;
+  editJsonButton.disabled = !canEdit || explorerEditMode;
+  jsonInspectorStatus.textContent = canEdit
+    ? explorerEditMode
+      ? "Bearbeite JSON und wende die Aenderung auf die aktuell geladene AAS an."
+      : ""
+    : "Dieser Gruppenknoten ist nur zur Navigation da und kann nicht direkt editiert werden.";
+  jsonInspectorStatus.className = `json-inspector-status${canEdit ? "" : " muted"}`;
+  renderInspectorCorrections(node);
+}
+
+function isExplorerNodeEditable(node) {
+  return node?.id === "package" || isPlainObject(node?.value);
+}
+
+function exitJsonEditMode() {
+  explorerEditMode = false;
+  explorerEditDraft = "";
+}
+
+function applyJsonInspectorEdit() {
+  const node = explorerNodes.get(selectedExplorerNodeId);
+  if (!node || !isExplorerNodeEditable(node)) throw new Error("Dieser Knoten kann nicht editiert werden.");
+
+  let parsed;
+  try {
+    parsed = JSON.parse(explorerEditDraft);
+  } catch (error) {
+    throw new Error(`JSON ist ungueltig: ${error.message}`);
+  }
+
+  if (node.id === "package") {
+    currentPackage = normalizeAasJson(parsed);
+    selectedExplorerNodeId = "package";
+  } else {
+    if (!isPlainObject(parsed)) throw new Error("Dieser Knoten erwartet ein JSON-Objekt.");
+    replaceObjectContents(node.value, parsed);
+  }
+
+  exitJsonEditMode();
+  refreshAfterPackageMutation("JSON-Aenderung angewendet.");
+}
+
+function replaceObjectContents(target, source) {
+  Object.keys(target).forEach((key) => delete target[key]);
+  Object.assign(target, source);
+}
+
+function refreshAfterPackageMutation(message) {
+  const report = validateAasPackage(currentPackage);
+  currentValidationReport = report;
+  renderValidation(report);
+  renderExplorer(currentPackage, searchInput.value);
+  refreshDashboardCatalog();
+  refreshDashboardValues();
+  updateRepositoryAccessState();
+  jsonInspectorStatus.className = "json-inspector-status success";
+  jsonInspectorStatus.textContent = message;
+}
+
+function renderInspectorCorrections(node) {
+  const suggestions = getInspectorCorrections(node);
+  jsonCorrectionSuggestions.innerHTML = suggestions.length
+    ? `
+      <div class="correction-title">Korrekturvorschlaege</div>
+      <div class="correction-actions">
+        ${suggestions
+          .map(
+            (suggestion) =>
+              `<button class="secondary-button" type="button" data-correction-action="${escapeHtml(suggestion.action)}">${escapeHtml(suggestion.label)}</button>`,
+          )
+          .join("")}
+      </div>
+    `
+    : "";
+}
+
+function getInspectorCorrections(node) {
+  const value = node?.value;
+  if (!isPlainObject(value)) return [];
+  const suggestions = [];
+
+  if (isReferenceLike(value) && value.keys?.some((key) => key?.type === "Submodel") && value.type !== "ModelReference") {
+    suggestions.push({ action: "repair-selected-submodel-reference", label: "Als Submodel-ModelReference setzen" });
+  }
+
+  if ((value.modelType === "Submodel" || submodelElementTypes.has(value.modelType)) && !value.semanticId) {
+    suggestions.push({ action: "add-selected-semantic-id", label: "semanticId-Vorschlag setzen" });
+  }
+
+  if ((value.qualifiers ?? []).some((qualifier) => qualifier?.type === "unit" && qualifier.valueType !== "xs:string")) {
+    suggestions.push({ action: "normalize-selected-unit-qualifiers", label: "Unit-Qualifier normalisieren" });
+  }
+
+  return suggestions;
+}
+
+function applyInspectorCorrection(action) {
+  const node = explorerNodes.get(selectedExplorerNodeId);
+  const value = node?.value;
+  if (!isPlainObject(value)) throw new Error("Keine editierbare Auswahl.");
+
+  if (action === "repair-selected-submodel-reference") {
+    repairSubmodelReference(value);
+    refreshAfterPackageMutation("Submodel-Referenz korrigiert.");
+    return;
+  }
+
+  if (action === "add-selected-semantic-id") {
+    addSemanticIdSuggestion(value);
+    refreshAfterPackageMutation("semanticId-Vorschlag gesetzt.");
+    return;
+  }
+
+  if (action === "normalize-selected-unit-qualifiers") {
+    normalizeUnitQualifiers(value);
+    refreshAfterPackageMutation("Unit-Qualifier normalisiert.");
+    return;
+  }
+
+  throw new Error("Unbekannter Korrekturvorschlag.");
+}
+
+function repairSubmodelReference(reference) {
+  if (!isReferenceLike(reference)) throw new Error("Auswahl ist keine Reference.");
+  reference.type = "ModelReference";
+  if (reference.keys.length === 0) reference.keys.push({ type: "Submodel", value: "" });
+  reference.keys[reference.keys.length - 1].type = "Submodel";
+}
+
+function addSemanticIdSuggestion(entity) {
+  if (!isPlainObject(entity)) throw new Error("Ziel ist kein Objekt.");
+  if (entity.semanticId) throw new Error("semanticId ist bereits vorhanden.");
+  const idShort = toIdShort(entity.idShort || entity.id || entity.modelType || "Element");
+  entity.semanticId = referenceTo("ConceptDescription", `https://example.com/semantic/${idShort}`);
+}
+
+function normalizeUnitQualifiers(entity) {
+  const unitQualifiers = (entity.qualifiers ?? []).filter((qualifier) => qualifier?.type === "unit");
+  if (unitQualifiers.length === 0) throw new Error("Kein unit-Qualifier vorhanden.");
+  unitQualifiers.forEach((qualifier) => {
+    qualifier.valueType = "xs:string";
+    if (typeof qualifier.value === "string") qualifier.value = qualifier.value.trim();
+  });
+}
+
+function findReferenceForIssuePath(path) {
+  const tokens = parseAasPath(path);
+  const keysIndex = tokens.indexOf("keys");
+  const candidatePaths = [];
+  if (keysIndex > 0) candidatePaths.push(tokens.slice(0, keysIndex));
+  candidatePaths.push(tokens);
+  for (let index = tokens.length - 1; index >= 0; index -= 1) {
+    candidatePaths.push(tokens.slice(0, index));
+  }
+
+  for (const candidatePath of candidatePaths) {
+    const value = getPathValue(currentPackage, candidatePath);
+    if (isReferenceLike(value)) return value;
+  }
+  return null;
+}
+
+function isReferenceLike(value) {
+  return isPlainObject(value) && Array.isArray(value.keys);
+}
+
+function parseAasPath(path) {
+  const tokens = [];
+  String(path || "")
+    .split(".")
+    .forEach((part) => {
+      const matcher = /([^\[\]]+)|\[(\d+)\]/g;
+      let match = matcher.exec(part);
+      while (match) {
+        tokens.push(match[1] ?? Number(match[2]));
+        match = matcher.exec(part);
+      }
+    });
+  return tokens;
+}
+
+function getPathValue(root, tokens) {
+  return tokens.reduce((value, token) => (value === undefined || value === null ? undefined : value[token]), root);
+}
+
+function setPathValue(root, tokens, value) {
+  if (tokens.length === 0) throw new Error("Leerer Pfad.");
+  const parent = getPathValue(root, tokens.slice(0, -1));
+  if (parent === undefined || parent === null) throw new Error("Pfad nicht gefunden.");
+  parent[tokens.at(-1)] = value;
 }
 
 function updateTreeControls(hasActiveSearch) {

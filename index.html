@@ -405,8 +405,16 @@
                 <div id="jsonInspectorMeta" class="meta">Lade eine AAS, um JSON zu inspizieren.</div>
               </div>
               <button id="copyJsonButton" class="secondary-button" type="button" disabled>Kopieren</button>
+              <button id="editJsonButton" class="secondary-button" type="button" disabled>Bearbeiten</button>
             </div>
             <pre id="jsonInspectorContent">Keine Daten geladen.</pre>
+            <textarea id="jsonInspectorEditor" class="json-editor" spellcheck="false" hidden></textarea>
+            <div id="jsonEditorActions" class="json-editor-actions" hidden>
+              <button id="saveJsonEditButton" class="primary-button" type="button">Änderung anwenden</button>
+              <button id="cancelJsonEditButton" class="secondary-button" type="button">Abbrechen</button>
+            </div>
+            <div id="jsonInspectorStatus" class="json-inspector-status"></div>
+            <div id="jsonCorrectionSuggestions" class="correction-suggestions"></div>
           </aside>
         </div>
       </section>

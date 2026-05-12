@@ -234,3 +234,9 @@
   - Repository stores, displays and filters AAS operating type metadata
   - Repository events include AAS operating type metadata
   - README and TODO reflect the operating-type roadmap
+- Added Explorer edit mode with correction suggestions:
+  - Selected JSON object nodes can be edited and applied to the loaded AAS
+  - Package-level JSON edits reload the whole AAS environment
+  - Validation reruns immediately after edits and updates Explorer/Dashboard state
+  - Issue cards offer quick fixes for common reference, whitespace, semanticId and unit warnings
+  - Inspector offers contextual correction suggestions for selected nodes

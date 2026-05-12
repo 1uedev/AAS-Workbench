@@ -14,6 +14,7 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 - AAS versioniert in einem lokalen Repository speichern, laden, vergleichen, nach Asset/Manufacturer/Semantic ID/Submodel durchsuchen und Traceability Events anzeigen
 - AAS-Strukturen gegen zentrale AAS-3.x-Metamodellregeln validieren
 - AAS, Submodels und Submodel Elements per Tree navigieren und durchsuchen
+- Explorer-Knoten im JSON-Edit-Modus bearbeiten und typische Validierungswarnungen per Korrekturvorschlag beheben
 - Dashboard-Karten und Numeric-Charts aus geladenen Submodel Elements erstellen, speichern und live aktualisieren
 - Ausgewaehlte Explorer-Knoten im Side-by-side JSON Inspector pruefen
 - Zwei Repository-Versionen eines AAS vergleichen und Aenderungen nach hinzugefuegt, entfernt und geaendert sehen
@@ -50,6 +51,8 @@ Der Validierungsreport-Export erzeugt eine maschinenlesbare JSON-Datei mit Schem
 ## Validierung
 
 Die Validierung prueft zentrale AAS-3.x-Regeln: Pflichtfelder, `modelType`, `idShort`, Reference-/Key-Struktur, lokale ModelReference-Ziele, Submodel-Referenzen, `semanticId`-Ziele, lokale ConceptDescriptions, globale Semantic-ID-Kennungen, `DataTypeDefXsd`-Werte inklusive Wertebereich und Lexik, Unit-Qualifier sowie verschachtelte Submodel Elements wie Collections, Lists, Entities, Operations, Events und Relationships. Issues werden nach Severity und Kategorien wie Struktur, Referenzen, Datentypen, Semantik, Units und Interoperabilitaet ausgewiesen.
+
+Der Explorer bietet fuer geladene AAS einen JSON-Edit-Modus pro auswählbarem Objekt. Änderungen werden direkt auf die aktuell geladene AAS angewendet und anschließend neu validiert. Fuer typische Issues wie falsche Submodel-Referenztypen, fehlende `semanticId`, Leerzeichen in Werten oder inkonsistente Unit-Qualifier werden Korrekturvorschlaege als Buttons angeboten.
 
 ## Generator und Gateway
 
