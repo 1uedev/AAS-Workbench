@@ -58,6 +58,8 @@ const refreshGatewayBackendButton = document.querySelector("#refreshGatewayBacke
 const opcUaConnectionList = document.querySelector("#opcUaConnectionList");
 const mqttBackendStatus = document.querySelector("#mqttBackendStatus");
 const mqttSubscriptionList = document.querySelector("#mqttSubscriptionList");
+const restBackendStatus = document.querySelector("#restBackendStatus");
+const restEndpointList = document.querySelector("#restEndpointList");
 const repositoryForm = document.querySelector("#repositoryForm");
 const repositoryReason = document.querySelector("#repositoryReason");
 const saveRepositoryButton = document.querySelector("#saveRepositoryButton");
@@ -87,6 +89,7 @@ let gatewayStatus = null;
 let gatewayEventSource = null;
 let opcUaConnections = [];
 let mqttSubscriptions = [];
+let restEndpoints = [];
 let repositoryAssets = [];
 let explorerNodes = new Map();
 let selectedExplorerNodeId = "package";
@@ -786,11 +789,14 @@ gatewayForm.addEventListener("submit", async (event) => {
   try {
     if (mapping.protocol === "MQTT") {
       await registerMqttSubscription(mapping);
+    } else if (mapping.protocol === "REST API") {
+      await registerRestEndpoint(mapping);
     } else {
       await registerOpcUaConnection(mapping);
     }
   } catch (error) {
-    const statusElement = mapping.protocol === "MQTT" ? mqttBackendStatus : gatewayBackendStatus;
+    const statusElement =
+      mapping.protocol === "MQTT" ? mqttBackendStatus : mapping.protocol === "REST API" ? restBackendStatus : gatewayBackendStatus;
     statusElement.textContent = `${mapping.protocol} Backend konnte das Mapping nicht speichern: ${error.message}`;
   }
 });
@@ -807,6 +813,12 @@ mqttSubscriptionList.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-mqtt-action]");
   if (!button) return;
   await runMqttSubscriptionAction(button.dataset.mqttAction, button.dataset.mqttSubscription, button.closest(".gateway-connection-card"));
+});
+
+restEndpointList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-rest-action]");
+  if (!button) return;
+  await runRestEndpointAction(button.dataset.restAction, button.dataset.restEndpoint, button.closest(".gateway-connection-card"));
 });
 
 mappingForm.addEventListener("submit", (event) => {
@@ -2196,8 +2208,26 @@ async function registerMqttSubscription(mapping) {
   mqttBackendStatus.textContent = `MQTT Subscription gespeichert: ${subscription.targetProperty || subscription.topic}.`;
 }
 
+async function registerRestEndpoint(mapping) {
+  restBackendStatus.textContent = "REST Endpoint wird gespeichert ...";
+  const response = await fetch("/api/rest/endpoints", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url: mapping.endpoint,
+      valuePath: mapping.sourceAddress,
+      targetProperty: mapping.targetProperty,
+      samplingInterval: mapping.samplingInterval,
+      writeEnabled: mapping.writeEnabled === "on",
+    }),
+  });
+  const endpoint = await readApiResponse(response);
+  await refreshGatewayBackends();
+  restBackendStatus.textContent = `REST Endpoint gespeichert: ${endpoint.targetProperty || endpoint.valuePath}.`;
+}
+
 async function refreshGatewayBackends() {
-  await Promise.all([refreshGatewayStatus(), refreshOpcUaConnections(), refreshMqttSubscriptions()]);
+  await Promise.all([refreshGatewayStatus(), refreshOpcUaConnections(), refreshMqttSubscriptions(), refreshRestEndpoints()]);
 }
 
 async function refreshGatewayStatus() {
@@ -2233,6 +2263,7 @@ function renderGatewayStatus() {
     <div class="gateway-protocol-summary">
       <div>OPC UA: ${escapeHtml(protocols.opcua?.mappings ?? 0)} Mappings | Adapter: ${escapeHtml(protocols.opcua?.adapter ?? "unbekannt")}</div>
       <div>MQTT: ${escapeHtml(protocols.mqtt?.mappings ?? 0)} Mappings | Adapter: ${escapeHtml(protocols.mqtt?.adapter ?? "unbekannt")}</div>
+      <div>REST API: ${escapeHtml(protocols.rest?.mappings ?? 0)} Mappings | Adapter: ${escapeHtml(protocols.rest?.adapter ?? "unbekannt")}</div>
     </div>
   `;
 }
@@ -2314,6 +2345,22 @@ async function refreshMqttSubscriptions() {
   }
 }
 
+async function refreshRestEndpoints() {
+  try {
+    const [statusResponse, endpointsResponse] = await Promise.all([
+      fetch("/api/rest"),
+      fetch("/api/rest/endpoints"),
+    ]);
+    const status = await readApiResponse(statusResponse);
+    restEndpoints = await readApiResponse(endpointsResponse);
+    restBackendStatus.textContent = `${status.status}: ${status.message}`;
+    renderRestEndpoints();
+  } catch (error) {
+    restBackendStatus.textContent = `REST Backend nicht verfuegbar: ${error.message}`;
+    restEndpointList.innerHTML = "";
+  }
+}
+
 function renderOpcUaConnections() {
   opcUaConnectionList.innerHTML = opcUaConnections.length
     ? opcUaConnections.map(renderOpcUaConnectionCard).join("")
@@ -2324,6 +2371,12 @@ function renderMqttSubscriptions() {
   mqttSubscriptionList.innerHTML = mqttSubscriptions.length
     ? mqttSubscriptions.map(renderMqttSubscriptionCard).join("")
     : `<div class="gateway-connection-card"><h3>Keine MQTT Subscriptions</h3><div class="gateway-connection-meta">Speichere zuerst ein MQTT-Mapping.</div></div>`;
+}
+
+function renderRestEndpoints() {
+  restEndpointList.innerHTML = restEndpoints.length
+    ? restEndpoints.map(renderRestEndpointCard).join("")
+    : `<div class="gateway-connection-card"><h3>Keine REST Endpoints</h3><div class="gateway-connection-meta">Speichere zuerst ein REST-Mapping.</div></div>`;
 }
 
 function renderOpcUaConnectionCard(connection) {
@@ -2376,21 +2429,64 @@ function renderMqttSubscriptionCard(subscription) {
   `;
 }
 
+function renderRestEndpointCard(endpoint) {
+  const status = endpoint.runtimeStatus || endpoint.status || "configured";
+  const lastValue = endpoint.lastValue === undefined ? "nicht gelesen" : endpoint.lastValue;
+  const lastReadAt = endpoint.lastReadAt ? formatDateTime(endpoint.lastReadAt) : "nie";
+  return `
+    <article class="gateway-connection-card">
+      <h3>${escapeHtml(endpoint.targetProperty || endpoint.valuePath)}</h3>
+      <div class="gateway-connection-meta">
+        <div>Status: ${escapeHtml(status)}</div>
+        <code>${escapeHtml(endpoint.url)}</code>
+        <code>${escapeHtml(endpoint.valuePath)}</code>
+        <div>Methode: ${escapeHtml(endpoint.readMethod || "GET")} | Last value: ${escapeHtml(lastValue)} | Read: ${escapeHtml(lastReadAt)}</div>
+        <div>Write-back: ${endpoint.writeEnabled ? "aktiv" : "gesperrt"}${endpoint.lastWriteAt ? ` | Last write: ${escapeHtml(endpoint.lastWriteValue)} (${escapeHtml(formatDateTime(endpoint.lastWriteAt))})` : ""}</div>
+        ${endpoint.lastError ? `<div>Fehler: ${escapeHtml(endpoint.lastError)}</div>` : ""}
+      </div>
+      <div class="action-row">
+        <button class="secondary-button" type="button" data-rest-action="read" data-rest-endpoint="${escapeHtml(endpoint.id)}">Wert lesen</button>
+      </div>
+      ${renderGatewayWriteControls("rest", endpoint)}
+    </article>
+  `;
+}
+
 function renderGatewayWriteControls(protocol, item) {
   if (!item.writeEnabled) {
     return `<div class="gateway-write-locked">Write-back ist fuer dieses Mapping nicht aktiviert.</div>`;
   }
 
-  const action = protocol === "opcua" ? "write" : "publish";
-  const dataAttribute = protocol === "opcua" ? "data-opcua-write-value" : "data-mqtt-write-value";
-  const buttonAttribute = protocol === "opcua" ? "data-opcua-action" : "data-mqtt-action";
-  const idAttribute = protocol === "opcua" ? "data-opcua-connection" : "data-mqtt-subscription";
-  const buttonLabel = protocol === "opcua" ? "Wert schreiben" : "Nachricht publishen";
+  const configs = {
+    opcua: {
+      action: "write",
+      dataAttribute: "data-opcua-write-value",
+      buttonAttribute: "data-opcua-action",
+      idAttribute: "data-opcua-connection",
+      buttonLabel: "Wert schreiben",
+    },
+    mqtt: {
+      action: "publish",
+      dataAttribute: "data-mqtt-write-value",
+      buttonAttribute: "data-mqtt-action",
+      idAttribute: "data-mqtt-subscription",
+      buttonLabel: "Nachricht publishen",
+    },
+    rest: {
+      action: "write",
+      dataAttribute: "data-rest-write-value",
+      buttonAttribute: "data-rest-action",
+      idAttribute: "data-rest-endpoint",
+      buttonLabel: "REST schreiben",
+    },
+  };
+  const config = configs[protocol];
+  if (!config) return "";
 
   return `
     <div class="gateway-write-panel">
-      <input ${dataAttribute} placeholder="Write-back Wert" />
-      <button class="secondary-button" type="button" ${buttonAttribute}="${action}" ${idAttribute}="${escapeHtml(item.id)}">${buttonLabel}</button>
+      <input ${config.dataAttribute} placeholder="Write-back Wert" />
+      <button class="secondary-button" type="button" ${config.buttonAttribute}="${config.action}" ${config.idAttribute}="${escapeHtml(item.id)}">${config.buttonLabel}</button>
     </div>
   `;
 }
@@ -2441,6 +2537,29 @@ async function runMqttSubscriptionAction(action, subscriptionId, card) {
     mqttBackendStatus.textContent = `${result.status}: ${result.lastError || "MQTT Aktion abgeschlossen."}`;
   } catch (error) {
     mqttBackendStatus.textContent = `MQTT Aktion fehlgeschlagen: ${error.message}`;
+  }
+}
+
+async function runRestEndpointAction(action, endpointId, card) {
+  if (!endpointId) return;
+  const labels = {
+    read: "REST Wert wird gelesen ...",
+    write: "REST Wert wird geschrieben ...",
+  };
+  restBackendStatus.textContent = labels[action] ?? "REST Aktion wird ausgefuehrt ...";
+
+  try {
+    const body = action === "write" ? getGatewayWriteBody(card, "[data-rest-write-value]") : null;
+    const response = await fetch(`/api/rest/endpoints/${encodeURIComponent(endpointId)}/${action}`, {
+      method: "POST",
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const result = await readApiResponse(response);
+    await refreshGatewayBackends();
+    restBackendStatus.textContent = `${result.status}: ${result.lastError || "REST Aktion abgeschlossen."}`;
+  } catch (error) {
+    restBackendStatus.textContent = `REST Aktion fehlgeschlagen: ${error.message}`;
   }
 }
 

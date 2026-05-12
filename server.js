@@ -69,6 +69,11 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (parts[1] === "rest") {
+    await handleRestApi(request, response, parts);
+    return;
+  }
+
   if (parts[1] !== "aas") {
     sendJson(response, 404, { error: "API route not found" });
     return;
@@ -169,11 +174,14 @@ function broadcastGatewaySnapshot() {
 function getGatewayServiceStatus() {
   const opcua = getOpcUaServiceStatus();
   const mqtt = getMqttServiceStatus();
+  const rest = getRestServiceStatus();
   const opcuaConnections = listOpcUaConnections();
   const mqttSubscriptions = listMqttSubscriptions();
+  const restEndpoints = listRestEndpoints();
   const opcuaRuntime = summarizeGatewayItems(opcuaConnections);
   const mqttRuntime = summarizeGatewayItems(mqttSubscriptions);
-  const runtime = mergeGatewaySummaries([opcuaRuntime, mqttRuntime]);
+  const restRuntime = summarizeGatewayItems(restEndpoints);
+  const runtime = mergeGatewaySummaries([opcuaRuntime, mqttRuntime, restRuntime]);
   const missingAdapters = [
     opcua.adapter === "not installed" ? "OPC UA" : "",
     mqtt.adapter === "not installed" ? "MQTT" : "",
@@ -204,6 +212,12 @@ function getGatewayServiceStatus() {
         mappings: mqttSubscriptions.length,
         runtime: mqttRuntime,
       },
+      rest: {
+        adapter: rest.adapter,
+        status: rest.status,
+        mappings: restEndpoints.length,
+        runtime: restRuntime,
+      },
     },
     recentValues: [
       ...opcuaConnections
@@ -223,6 +237,15 @@ function getGatewayServiceStatus() {
           source: subscription.lastTopic || subscription.topic,
           value: subscription.lastMessage,
           receivedAt: subscription.lastMessageAt || "",
+        })),
+      ...restEndpoints
+        .filter((endpoint) => endpoint.lastValue !== undefined)
+        .map((endpoint) => ({
+          protocol: "REST API",
+          label: endpoint.targetProperty || endpoint.valuePath || endpoint.url,
+          source: endpoint.valuePath ? `${endpoint.url} -> ${endpoint.valuePath}` : endpoint.url,
+          value: endpoint.lastValue,
+          receivedAt: endpoint.lastReadAt || "",
         })),
     ]
       .sort((a, b) => String(b.receivedAt).localeCompare(String(a.receivedAt)))
@@ -873,6 +896,263 @@ function loadMqttAdapter() {
   }
 }
 
+async function handleRestApi(request, response, parts) {
+  if (request.method === "GET" && parts.length === 2) {
+    sendJson(response, 200, getRestServiceStatus());
+    return;
+  }
+
+  if (request.method === "GET" && parts.length === 3 && parts[2] === "endpoints") {
+    sendJson(response, 200, listRestEndpoints());
+    return;
+  }
+
+  if (request.method === "POST" && parts.length === 3 && parts[2] === "endpoints") {
+    sendJson(response, 201, saveRestEndpoint(await readJsonBody(request)));
+    return;
+  }
+
+  const endpointId = parts[3];
+  if (!endpointId || parts[2] !== "endpoints") {
+    sendJson(response, 404, { error: "REST route not found" });
+    return;
+  }
+
+  if (request.method === "POST" && parts.length === 5 && parts[4] === "read") {
+    sendJson(response, 200, await readRestEndpoint(endpointId));
+    return;
+  }
+
+  if (request.method === "POST" && parts.length === 5 && parts[4] === "write") {
+    sendJson(response, 200, await writeRestEndpoint(endpointId, await readJsonBody(request)));
+    return;
+  }
+
+  sendJson(response, 404, { error: "REST route not found" });
+}
+
+function getRestServiceStatus() {
+  const available = typeof fetch === "function";
+  return {
+    service: "rest",
+    status: available ? "ready" : "adapter_unavailable",
+    adapter: available ? "built-in fetch" : "not available",
+    endpoints: listRestEndpoints().length,
+    message: available
+      ? "REST API backend service is ready."
+      : "REST API backend requires a Node runtime with global fetch.",
+  };
+}
+
+function listRestEndpoints() {
+  return readGatewayStore().restEndpoints.map((endpoint) => ({
+    ...endpoint,
+    runtimeStatus: endpoint.status,
+  }));
+}
+
+function saveRestEndpoint(body) {
+  const url = normalizeRestUrl(body.url ?? body.endpoint ?? "");
+  const valuePath = String(body.valuePath ?? body.sourceAddress ?? "").trim();
+  const targetProperty = String(body.targetProperty ?? "").trim();
+  const samplingInterval = Number(body.samplingInterval || 1000);
+  const writeEnabled = parseWriteEnabled(body.writeEnabled);
+
+  if (!valuePath) {
+    const error = new Error("REST value path is required");
+    error.status = 400;
+    throw error;
+  }
+
+  const store = readGatewayStore();
+  const now = new Date().toISOString();
+  const existing = store.restEndpoints.find(
+    (endpoint) => endpoint.url === url && endpoint.valuePath === valuePath && endpoint.targetProperty === targetProperty,
+  );
+  const endpoint = existing ?? {
+    id: crypto.randomUUID(),
+    createdAt: now,
+    status: "configured",
+  };
+
+  Object.assign(endpoint, {
+    url,
+    valuePath,
+    targetProperty,
+    samplingInterval: Number.isFinite(samplingInterval) ? samplingInterval : 1000,
+    readMethod: "GET",
+    writeMethod: endpoint.writeMethod || "POST",
+    writeEnabled,
+    updatedAt: now,
+    lastError: "",
+  });
+
+  if (!existing) store.restEndpoints.push(endpoint);
+  writeGatewayStore(store);
+  broadcastGatewaySnapshot();
+  return endpoint;
+}
+
+async function readRestEndpoint(endpointId) {
+  const endpoint = findRestEndpoint(endpointId);
+  if (typeof fetch !== "function") {
+    return updateRestEndpointStatus(endpointId, "adapter_unavailable", "Global fetch is not available in this Node runtime.");
+  }
+
+  try {
+    const response = await fetchRestUrl(endpoint.url, { method: "GET", acceptJson: true });
+    if (!response.ok) throw new Error(`REST read failed with HTTP ${response.status}`);
+    const payload = await parseRestResponse(response);
+    const value = extractRestValue(payload, endpoint.valuePath);
+    return updateRestEndpointStatus(endpointId, "connected", "", value);
+  } catch (error) {
+    return updateRestEndpointStatus(endpointId, "error", restErrorMessage(error));
+  }
+}
+
+async function writeRestEndpoint(endpointId, body) {
+  const endpoint = findRestEndpoint(endpointId);
+  const value = requireSafeWrite(endpoint, body, "REST");
+  const method = normalizeRestWriteMethod(body.method || body.writeMethod || endpoint.writeMethod || "POST");
+  if (typeof fetch !== "function") {
+    return updateRestEndpointStatus(endpointId, "adapter_unavailable", "Global fetch is not available in this Node runtime.");
+  }
+
+  try {
+    const response = await fetchRestUrl(endpoint.url, {
+      method,
+      acceptJson: true,
+      body: JSON.stringify({
+        value,
+        targetProperty: endpoint.targetProperty,
+        valuePath: endpoint.valuePath,
+      }),
+    });
+    if (!response.ok) throw new Error(`REST write failed with HTTP ${response.status}`);
+    return updateRestEndpointWrite(endpointId, value, method, response.status);
+  } catch (error) {
+    return updateRestEndpointStatus(endpointId, "error", restErrorMessage(error));
+  }
+}
+
+async function fetchRestUrl(url, options = {}) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  const headers = options.acceptJson ? { Accept: "application/json" } : {};
+  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+
+  try {
+    return await fetch(url, {
+      method: options.method || "GET",
+      headers,
+      body: options.body,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function parseRestResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+  const text = await response.text();
+  if (!text) return null;
+  if (contentType.includes("json")) return JSON.parse(text);
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function extractRestValue(payload, valuePath) {
+  const pathSegments = String(valuePath || "")
+    .split(".")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  let current = payload;
+
+  for (const segment of pathSegments) {
+    if (current === null || current === undefined) throw new Error(`REST value path not found: ${valuePath}`);
+    const key = Array.isArray(current) && /^\d+$/.test(segment) ? Number(segment) : segment;
+    if (!Object.prototype.hasOwnProperty.call(Object(current), key)) {
+      throw new Error(`REST value path not found: ${valuePath}`);
+    }
+    current = current[key];
+  }
+
+  return current;
+}
+
+function normalizeRestUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error();
+    }
+    return url.toString();
+  } catch {
+    const error = new Error("REST URL must start with http:// or https://");
+    error.status = 400;
+    throw error;
+  }
+}
+
+function normalizeRestWriteMethod(method) {
+  const normalized = String(method || "POST").trim().toUpperCase();
+  if (["POST", "PUT", "PATCH"].includes(normalized)) return normalized;
+  const error = new Error("REST write method must be POST, PUT or PATCH");
+  error.status = 400;
+  throw error;
+}
+
+function updateRestEndpointStatus(endpointId, status, errorMessage = "", value) {
+  const store = readGatewayStore();
+  const endpoint = store.restEndpoints.find((candidate) => candidate.id === endpointId);
+  if (!endpoint) throw notFound("REST endpoint not found");
+  endpoint.status = status;
+  endpoint.lastError = errorMessage;
+  endpoint.lastReadAt = value === undefined ? endpoint.lastReadAt : new Date().toISOString();
+  endpoint.lastValue = value === undefined ? endpoint.lastValue : formatGatewayValue(value);
+  endpoint.updatedAt = new Date().toISOString();
+  writeGatewayStore(store);
+  broadcastGatewaySnapshot();
+  return endpoint;
+}
+
+function updateRestEndpointWrite(endpointId, value, method, statusCode) {
+  const store = readGatewayStore();
+  const endpoint = store.restEndpoints.find((candidate) => candidate.id === endpointId);
+  if (!endpoint) throw notFound("REST endpoint not found");
+  endpoint.status = "connected";
+  endpoint.lastError = "";
+  endpoint.lastWriteAt = new Date().toISOString();
+  endpoint.lastWriteValue = String(value);
+  endpoint.lastWriteMethod = method;
+  endpoint.lastWriteStatus = String(statusCode);
+  endpoint.updatedAt = new Date().toISOString();
+  writeGatewayStore(store);
+  broadcastGatewaySnapshot();
+  return endpoint;
+}
+
+function findRestEndpoint(endpointId) {
+  const endpoint = readGatewayStore().restEndpoints.find((candidate) => candidate.id === endpointId);
+  if (!endpoint) throw notFound("REST endpoint not found");
+  return endpoint;
+}
+
+function formatGatewayValue(value) {
+  if (value === undefined) return "";
+  if (value === null) return "null";
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
+function restErrorMessage(error) {
+  return error.name === "AbortError" ? "REST request timed out" : error.message;
+}
+
 function parseWriteEnabled(value) {
   return value === true || value === "true" || value === "on" || value === "1";
 }
@@ -1062,7 +1342,7 @@ function ensureRepository() {
 function ensureGatewayStore() {
   fs.mkdirSync(dataDir, { recursive: true });
   if (!fs.existsSync(gatewayPath)) {
-    writeGatewayStore({ opcuaConnections: [], mqttSubscriptions: [] });
+    writeGatewayStore({ opcuaConnections: [], mqttSubscriptions: [], restEndpoints: [] });
   }
 }
 
@@ -1081,6 +1361,7 @@ function readGatewayStore() {
   return {
     opcuaConnections: Array.isArray(store.opcuaConnections) ? store.opcuaConnections : [],
     mqttSubscriptions: Array.isArray(store.mqttSubscriptions) ? store.mqttSubscriptions : [],
+    restEndpoints: Array.isArray(store.restEndpoints) ? store.restEndpoints : [],
   };
 }
 

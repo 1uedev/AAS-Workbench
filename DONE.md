@@ -215,3 +215,9 @@
 - Realistic sample AASX files passed `unzip -t`.
 - Realistic sample AASX files imported successfully with the Workbench import module.
 - AASX import path tested with a realistic sample file after adding drop support.
+- Added REST API gateway backend:
+  - REST endpoint persistence in `data/gateway.json`
+  - `/api/rest` status, endpoint registration, JSON-path read and safe write-back routes
+  - Unified gateway status and live-value stream include REST runtime status and recent REST values
+  - Gateway UI supports REST API mappings, backend status cards, read actions and guarded write-back
+  - README updated with REST API gateway routes and behavior

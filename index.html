@@ -94,7 +94,7 @@
         </a>
         <a class="home-module" href="#gateway">
           <span class="feature-kicker">Gateway</span>
-          <strong>OPC UA / MQTT verbinden</strong>
+          <strong>OPC UA / MQTT / REST verbinden</strong>
           <span>Gateway-Mappings dokumentieren und Backend-Verbindungen verwalten.</span>
         </a>
       </section>
@@ -181,7 +181,7 @@
       <section class="workspace-panel gateway-panel" data-panel="gateway" aria-labelledby="gateway-title">
         <div class="section-heading">
           <p class="eyebrow">Gateway</p>
-          <h2 id="gateway-title">OPC UA / MQTT Mapping</h2>
+          <h2 id="gateway-title">OPC UA / MQTT / REST Mapping</h2>
         </div>
         <form id="gatewayForm" class="tool-form">
           <div class="form-grid">
@@ -190,15 +190,16 @@
               <select name="protocol" required>
                 <option value="OPC UA">OPC UA</option>
                 <option value="MQTT">MQTT</option>
+                <option value="REST API">REST API</option>
               </select>
             </label>
             <label class="field">
-              <span>Endpoint / Broker</span>
-              <input name="endpoint" required placeholder="opc.tcp://localhost:4840 oder mqtt://broker:1883" />
+              <span>Endpoint / Broker / URL</span>
+              <input name="endpoint" required placeholder="opc.tcp://localhost:4840, mqtt://broker:1883 oder https://api.example.com/status" />
             </label>
             <label class="field">
-              <span>Node ID / Topic</span>
-              <input name="sourceAddress" required placeholder="ns=2;s=Pump.Power oder factory/pump/power" />
+              <span>Node ID / Topic / JSON path</span>
+              <input name="sourceAddress" required placeholder="ns=2;s=Pump.Power, factory/pump/power oder data.temperature" />
             </label>
             <label class="field">
               <span>Ziel-Property</span>
@@ -238,6 +239,11 @@
               <div class="form-section-title">MQTT</div>
               <div id="mqttBackendStatus" class="summary-text">MQTT-Status wird geladen ...</div>
               <div id="mqttSubscriptionList" class="gateway-connection-list"></div>
+            </section>
+            <section class="gateway-backend-section">
+              <div class="form-section-title">REST API</div>
+              <div id="restBackendStatus" class="summary-text">REST-Status wird geladen ...</div>
+              <div id="restEndpointList" class="gateway-connection-list"></div>
             </section>
           </div>
         </div>
