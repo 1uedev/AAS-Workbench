@@ -174,6 +174,28 @@
               <input name="typeAasId" placeholder="urn:example:type:Pump-Series-A:aas" />
             </label>
           </div>
+          <div id="runtimeDescriptorPanel" class="runtime-descriptor-panel" hidden>
+            <div class="form-section-title">Laufzeit-Descriptor</div>
+            <div class="form-grid">
+              <label class="field">
+                <span>Service Endpoint</span>
+                <input name="runtimeEndpoint" placeholder="https://api.example.com/status oder opc.tcp://localhost:4840" />
+              </label>
+              <label class="field">
+                <span>Service Name</span>
+                <input name="runtimeServiceName" placeholder="StatusService" />
+              </label>
+              <label class="field">
+                <span>Source Address</span>
+                <input name="runtimeSourceAddress" placeholder="data.status, ns=2;s=Pump.Status oder factory/pump/status" />
+              </label>
+              <label class="field">
+                <span>Sampling ms</span>
+                <input name="runtimeSamplingInterval" type="number" min="100" step="100" value="1000" />
+              </label>
+            </div>
+            <div id="runtimeGuidance" class="runtime-guidance" aria-live="polite"></div>
+          </div>
           <div class="generator-template-panel">
             <div class="form-section-title">Submodel Templates</div>
             <div class="template-controls">

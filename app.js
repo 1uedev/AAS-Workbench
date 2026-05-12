@@ -46,6 +46,8 @@ const submodelTemplateSelect = document.querySelector("#submodelTemplateSelect")
 const addTemplateButton = document.querySelector("#addTemplateButton");
 const templatePreview = document.querySelector("#templatePreview");
 const generatorPreview = document.querySelector("#generatorPreview");
+const runtimeDescriptorPanel = document.querySelector("#runtimeDescriptorPanel");
+const runtimeGuidance = document.querySelector("#runtimeGuidance");
 const dashboardElementSelect = document.querySelector("#dashboardElementSelect");
 const dashboardWidgetType = document.querySelector("#dashboardWidgetType");
 const dashboardLiveToggle = document.querySelector("#dashboardLiveToggle");
@@ -999,6 +1001,7 @@ function renderGeneratorPreview() {
   const assetKind = normalizeGeneratorAssetKind(formData.get("assetKind"));
   const runtimeType = normalizeAasRuntimeType(formData.get("runtimeType"));
   const typeAasId = String(formData.get("typeAasId") ?? "").trim();
+  const runtimeDescriptor = getGeneratorRuntimeDescriptor(formData);
   const submodels = [...submodelBuilder.querySelectorAll(".submodel-editor")].map((submodelEditor) => {
     const submodelName = submodelEditor.querySelector("[data-field='submodelName']").value.trim();
     const explicitSubmodelId = submodelEditor.querySelector("[data-field='submodelId']").value.trim();
@@ -1024,12 +1027,15 @@ function renderGeneratorPreview() {
       : assetKind === "Type"
         ? " | dient als Type-AAS Vorlage"
         : "";
+  const runtimeGuidanceState = getRuntimeDescriptorGuidanceState(runtimeType, runtimeDescriptor);
+  renderRuntimeGuidance(runtimeGuidanceState);
 
   generatorPreview.innerHTML = `
     <div class="preview-card">
       <h3>${escapeHtml(assetLabel)}</h3>
       <p>${escapeHtml(assetId || "Asset ID fehlt noch")} | ${escapeHtml(formatAssetKind(assetKind))} | ${escapeHtml(formatAasRuntimeType(runtimeType))} | ${submodels.length} Submodel | ${propertyCount} Properties${escapeHtml(typeRelationText)}</p>
     </div>
+    ${renderRuntimePreviewCard(runtimeGuidanceState)}
     ${submodels
       .map((submodel) => {
         const properties = submodel.properties.length
@@ -1049,6 +1055,70 @@ function renderGeneratorPreview() {
         `;
       })
       .join("")}
+  `;
+}
+
+function getGeneratorRuntimeDescriptor(formData = new FormData(manualGeneratorForm)) {
+  return {
+    endpoint: String(formData.get("runtimeEndpoint") ?? "").trim(),
+    serviceName: String(formData.get("runtimeServiceName") ?? "").trim(),
+    sourceAddress: String(formData.get("runtimeSourceAddress") ?? "").trim(),
+    samplingInterval: String(formData.get("runtimeSamplingInterval") ?? "").trim(),
+  };
+}
+
+function getRuntimeDescriptorGuidanceState(runtimeType, descriptor) {
+  if (runtimeType === "Type1Passive") {
+    return {
+      runtimeType,
+      visible: false,
+      status: "neutral",
+      title: "Kein Laufzeit-Descriptor",
+      items: [],
+      descriptor,
+    };
+  }
+
+  const missing = [];
+  if (!descriptor.endpoint) missing.push("Service Endpoint");
+  if (!descriptor.serviceName && !descriptor.sourceAddress) missing.push("Service Name oder Source Address");
+
+  return {
+    runtimeType,
+    visible: true,
+    status: missing.length ? "warning" : "ready",
+    title: missing.length ? `${formatAasRuntimeType(runtimeType)} unvollstaendig` : `${formatAasRuntimeType(runtimeType)} mit Laufzeit-Descriptor`,
+    items: missing.length
+      ? missing.map((item) => `${item} fehlt`)
+      : [
+          `Endpoint: ${descriptor.endpoint}`,
+          `Service: ${descriptor.serviceName || descriptor.sourceAddress}`,
+          `Sampling: ${descriptor.samplingInterval || "1000"} ms`,
+        ],
+    descriptor,
+  };
+}
+
+function renderRuntimeGuidance(state) {
+  runtimeDescriptorPanel.hidden = !state.visible;
+  runtimeGuidance.className = `runtime-guidance ${state.status}`;
+  runtimeGuidance.innerHTML = state.visible
+    ? `
+      <strong>${escapeHtml(state.title)}</strong>
+      <div>${state.items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+    `
+    : "";
+}
+
+function renderRuntimePreviewCard(state) {
+  if (!state.visible) return "";
+  return `
+    <div class="preview-card runtime-preview-card ${escapeHtml(state.status)}">
+      <h4>${escapeHtml(state.title)}</h4>
+      <div class="preview-tags">
+        ${state.items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+      </div>
+    </div>
   `;
 }
 
@@ -1145,6 +1215,7 @@ function buildPackageFromGenerator() {
   const assetKind = normalizeGeneratorAssetKind(formData.get("assetKind"));
   const runtimeType = normalizeAasRuntimeType(formData.get("runtimeType"));
   const typeAasId = String(formData.get("typeAasId") ?? "").trim();
+  const runtimeDescriptor = getGeneratorRuntimeDescriptor(formData);
   if (!assetId || !assetName) {
     throw new Error("Asset ID und Asset Name sind Pflichtfelder.");
   }
@@ -1182,7 +1253,82 @@ function buildPackageFromGenerator() {
     throw new Error("Mindestens eine Property ist erforderlich.");
   }
 
-  return recordsToAasPackage(records, { assetKind, runtimeType, typeAasId });
+  const aasPackage = recordsToAasPackage(records, { assetKind, runtimeType, typeAasId });
+  addRuntimeServiceDescriptor(aasPackage, runtimeType, runtimeDescriptor);
+  return aasPackage;
+}
+
+function addRuntimeServiceDescriptor(aasPackage, runtimeType, descriptor) {
+  if (runtimeType === "Type1Passive" || !hasRuntimeDescriptorValues(descriptor)) return;
+  const shell = aasPackage.assetAdministrationShells?.[0];
+  if (!shell) return;
+
+  const assetId = shell.assetInformation?.globalAssetId ?? shell.id ?? "asset";
+  const submodelId = `${assetId}:submodel:RuntimeServices`;
+  aasPackage.submodels = Array.isArray(aasPackage.submodels) ? aasPackage.submodels : [];
+  let submodel = aasPackage.submodels.find((candidate) => candidate.id === submodelId);
+
+  if (!submodel) {
+    submodel = {
+      modelType: "Submodel",
+      id: submodelId,
+      idShort: "RuntimeServices",
+      semanticId: referenceTo("ConceptDescription", "https://admin-shell.io/idta/RuntimeServices"),
+      submodelElements: [],
+    };
+    aasPackage.submodels.push(submodel);
+  }
+
+  shell.submodels = Array.isArray(shell.submodels) ? shell.submodels : [];
+  if (!shell.submodels.some((reference) => reference.keys?.at(-1)?.value === submodelId)) {
+    shell.submodels.push(referenceTo("Submodel", submodelId));
+  }
+
+  const serviceName = descriptor.serviceName || descriptor.sourceAddress || "RuntimeService";
+  const serviceIdShort = toIdShort(serviceName);
+  const descriptorElements = [
+    runtimeDescriptorProperty("RuntimeType", formatAasRuntimeType(runtimeType)),
+    runtimeDescriptorProperty("ServiceName", serviceName),
+    descriptor.endpoint ? runtimeDescriptorProperty("RuntimeEndpoint", descriptor.endpoint, "xs:anyURI") : null,
+    descriptor.sourceAddress ? runtimeDescriptorProperty("SourceAddress", descriptor.sourceAddress) : null,
+    descriptor.endpoint ? runtimeDescriptorProperty("Protocol", inferRuntimeProtocol(descriptor.endpoint)) : null,
+    runtimeDescriptorProperty("SamplingInterval", descriptor.samplingInterval || "1000", "xs:integer", "ms"),
+  ].filter(Boolean);
+
+  submodel.submodelElements.push({
+    modelType: "SubmodelElementCollection",
+    idShort: `${serviceIdShort}Descriptor`,
+    semanticId: referenceTo("ConceptDescription", "https://admin-shell.io/idta/RuntimeServiceDescriptor"),
+    value: descriptorElements,
+  });
+}
+
+function hasRuntimeDescriptorValues(descriptor) {
+  return Boolean(descriptor.endpoint || descriptor.serviceName || descriptor.sourceAddress);
+}
+
+function runtimeDescriptorProperty(idShort, value, valueType = "xs:string", unit = "") {
+  const property = {
+    modelType: "Property",
+    idShort,
+    valueType,
+    value: String(value ?? ""),
+  };
+
+  if (unit) {
+    property.qualifiers = [{ type: "unit", valueType: "xs:string", value: unit }];
+  }
+
+  return property;
+}
+
+function inferRuntimeProtocol(endpoint) {
+  const value = String(endpoint ?? "").trim().toLowerCase();
+  if (value.startsWith("opc.tcp://")) return "OPC UA";
+  if (value.startsWith("mqtt://") || value.startsWith("mqtts://")) return "MQTT";
+  if (value.startsWith("http://") || value.startsWith("https://")) return "REST API";
+  if (value.startsWith("ws://") || value.startsWith("wss://")) return "WebSocket";
+  return "Service";
 }
 
 function refreshDashboardCatalog() {

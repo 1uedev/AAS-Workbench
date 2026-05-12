@@ -246,3 +246,9 @@
   - Type 3 proactive AAS validation checks for communication endpoints
   - Type 3 proactive AAS validation checks for autonomous interaction elements like Operation, BasicEventElement or Capability
   - TODO now points to endpoint/service descriptor guidance as the next operating-type task
+- Added endpoint/service descriptor guidance for reactive AAS:
+  - Generator shows Laufzeit-Descriptor fields when Typ 2 or Typ 3 is selected
+  - Generator preview flags missing Service Endpoint and Service Name or Source Address
+  - Generated AAS packages include entered runtime data as a `RuntimeServices` Submodel
+  - Runtime descriptor properties include endpoint, protocol, service/source address and sampling interval
+  - TODO now points to the proactive interaction workflow model

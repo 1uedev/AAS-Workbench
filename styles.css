@@ -559,6 +559,7 @@ body[data-route="dashboard"] .app-shell {
 }
 
 .generator-template-panel,
+.runtime-descriptor-panel,
 .generator-preview-panel {
   display: grid;
   gap: 12px;
@@ -566,6 +567,51 @@ body[data-route="dashboard"] .app-shell {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfa;
+}
+
+.runtime-descriptor-panel[hidden] {
+  display: none;
+}
+
+.runtime-guidance {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.runtime-guidance strong {
+  color: var(--ink);
+}
+
+.runtime-guidance div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.runtime-guidance span {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: #f7faf7;
+  color: var(--ink);
+}
+
+.runtime-guidance.warning,
+.runtime-preview-card.warning {
+  border-color: #f0c36b;
+  background: #fff8e5;
+}
+
+.runtime-guidance.ready,
+.runtime-preview-card.ready {
+  border-color: #9cc7b0;
+  background: #f0faf3;
 }
 
 .template-controls {

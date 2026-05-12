@@ -4,11 +4,10 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add endpoint/service descriptor guidance for reactive AAS.
+- [ ] Add proactive interaction workflow model.
 
 ## AAS Operating Types
 
-- [ ] Add endpoint/service descriptor guidance for reactive AAS.
 - [ ] Add proactive interaction workflow model.
 
 ## AAS Type / Instance Modeling
