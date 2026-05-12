@@ -818,6 +818,28 @@ body[data-route="dashboard"] .app-shell {
   overflow-wrap: anywhere;
 }
 
+.gateway-write-toggle {
+  align-self: end;
+}
+
+.gateway-write-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.gateway-write-panel input {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+}
+
+.gateway-write-locked {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .repository-list {
   display: grid;
   gap: 12px;

@@ -328,6 +328,11 @@ async function handleOpcUaApi(request, response, parts) {
     return;
   }
 
+  if (request.method === "POST" && parts.length === 5 && parts[4] === "write") {
+    sendJson(response, 200, await writeOpcUaConnection(connectionId, await readJsonBody(request)));
+    return;
+  }
+
   sendJson(response, 404, { error: "OPC UA route not found" });
 }
 
@@ -356,6 +361,7 @@ function saveOpcUaConnection(body) {
   const nodeId = String(body.nodeId ?? body.sourceAddress ?? "").trim();
   const targetProperty = String(body.targetProperty ?? "").trim();
   const samplingInterval = Number(body.samplingInterval || 1000);
+  const writeEnabled = parseWriteEnabled(body.writeEnabled);
 
   if (!endpoint.startsWith("opc.tcp://")) {
     const error = new Error("OPC UA endpoint must start with opc.tcp://");
@@ -385,6 +391,7 @@ function saveOpcUaConnection(body) {
     nodeId,
     targetProperty,
     samplingInterval: Number.isFinite(samplingInterval) ? samplingInterval : 1000,
+    writeEnabled,
     updatedAt: now,
     lastError: "",
   });
@@ -449,6 +456,76 @@ async function readOpcUaConnection(connectionId) {
   }
 }
 
+async function writeOpcUaConnection(connectionId, body) {
+  const connection = findOpcUaConnection(connectionId);
+  const value = requireSafeWrite(connection, body, "OPC UA");
+  const adapter = loadOpcUaAdapter();
+  if (!adapter.available) return updateOpcUaConnectionStatus(connectionId, "adapter_unavailable", adapter.error.message);
+
+  let runtime = opcUaRuntimeConnections.get(connectionId);
+  if (!runtime) {
+    const connected = await connectOpcUaConnection(connectionId);
+    if (connected.status !== "connected") return connected;
+    runtime = opcUaRuntimeConnections.get(connectionId);
+  }
+
+  try {
+    const valueType = body.valueType || inferWriteValueType(value);
+    const statusCode = await runtime.session.write({
+      nodeId: connection.nodeId,
+      attributeId: adapter.module.AttributeIds.Value,
+      value: {
+        value: createOpcUaVariant(adapter, value, valueType),
+      },
+    });
+
+    if (statusCode?.isNotGood?.()) {
+      throw new Error(`OPC UA write failed with status ${statusCode.toString()}`);
+    }
+
+    return updateOpcUaConnectionWrite(connectionId, value, valueType, statusCode?.toString?.() || "Good");
+  } catch (error) {
+    return updateOpcUaConnectionStatus(connectionId, "error", error.message);
+  }
+}
+
+function createOpcUaVariant(adapter, value, valueType) {
+  const type = String(valueType || "string").toLowerCase();
+  const { DataType, Variant } = adapter.module;
+
+  if (type === "boolean" || type === "bool" || type === "xs:boolean") {
+    return new Variant({ dataType: DataType.Boolean, value: value === true || value === "true" || value === "1" });
+  }
+
+  if (type === "integer" || type === "int" || type === "int32" || type === "xs:integer" || type === "xs:int") {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed)) throw new Error("OPC UA integer write requires an integer value");
+    return new Variant({ dataType: DataType.Int32, value: parsed });
+  }
+
+  if (type === "float" || type === "single" || type === "xs:float") {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new Error("OPC UA float write requires a numeric value");
+    return new Variant({ dataType: DataType.Float, value: parsed });
+  }
+
+  if (type === "double" || type === "number" || type === "xs:double") {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new Error("OPC UA double write requires a numeric value");
+    return new Variant({ dataType: DataType.Double, value: parsed });
+  }
+
+  return new Variant({ dataType: DataType.String, value: String(value) });
+}
+
+function inferWriteValueType(value) {
+  const text = String(value).trim();
+  if (text === "true" || text === "false") return "boolean";
+  if (/^-?\d+$/.test(text)) return "integer";
+  if (/^-?\d+\.\d+$/.test(text)) return "double";
+  return "string";
+}
+
 function updateOpcUaConnectionStatus(connectionId, status, errorMessage = "", value) {
   const store = readGatewayStore();
   const connection = store.opcuaConnections.find((candidate) => candidate.id === connectionId);
@@ -457,6 +534,22 @@ function updateOpcUaConnectionStatus(connectionId, status, errorMessage = "", va
   connection.lastError = errorMessage;
   connection.lastReadAt = value === undefined ? connection.lastReadAt : new Date().toISOString();
   connection.lastValue = value === undefined ? connection.lastValue : String(value);
+  connection.updatedAt = new Date().toISOString();
+  writeGatewayStore(store);
+  broadcastGatewaySnapshot();
+  return connection;
+}
+
+function updateOpcUaConnectionWrite(connectionId, value, valueType, writeStatus) {
+  const store = readGatewayStore();
+  const connection = store.opcuaConnections.find((candidate) => candidate.id === connectionId);
+  if (!connection) throw notFound("OPC UA connection not found");
+  connection.status = "connected";
+  connection.lastError = "";
+  connection.lastWriteAt = new Date().toISOString();
+  connection.lastWriteValue = String(value);
+  connection.lastWriteType = String(valueType);
+  connection.lastWriteStatus = writeStatus;
   connection.updatedAt = new Date().toISOString();
   writeGatewayStore(store);
   broadcastGatewaySnapshot();
@@ -509,6 +602,11 @@ async function handleMqttApi(request, response, parts) {
     return;
   }
 
+  if (request.method === "POST" && parts.length === 5 && parts[4] === "publish") {
+    sendJson(response, 200, await publishMqttSubscription(subscriptionId, await readJsonBody(request)));
+    return;
+  }
+
   sendJson(response, 404, { error: "MQTT route not found" });
 }
 
@@ -538,6 +636,7 @@ function saveMqttSubscription(body) {
   const targetProperty = String(body.targetProperty ?? "").trim();
   const samplingInterval = Number(body.samplingInterval || 1000);
   const qos = Number(body.qos ?? 0);
+  const writeEnabled = parseWriteEnabled(body.writeEnabled);
 
   if (!["mqtt://", "mqtts://", "ws://", "wss://"].some((prefix) => brokerUrl.startsWith(prefix))) {
     const error = new Error("MQTT broker URL must start with mqtt://, mqtts://, ws:// or wss://");
@@ -569,6 +668,7 @@ function saveMqttSubscription(body) {
     targetProperty,
     samplingInterval: Number.isFinite(samplingInterval) ? samplingInterval : 1000,
     qos: [0, 1, 2].includes(qos) ? qos : 0,
+    writeEnabled,
     updatedAt: now,
     lastError: "",
   });
@@ -622,6 +722,43 @@ async function disconnectMqttSubscription(subscriptionId) {
     }
   }
   return updateMqttSubscriptionStatus(subscriptionId, "disconnected", "");
+}
+
+async function publishMqttSubscription(subscriptionId, body) {
+  const subscription = findMqttSubscription(subscriptionId);
+  const value = requireSafeWrite(subscription, body, "MQTT");
+
+  if (subscription.topic.includes("+") || subscription.topic.includes("#")) {
+    const error = new Error("MQTT write-back requires an exact topic without + or # wildcards");
+    error.status = 400;
+    throw error;
+  }
+
+  const adapter = loadMqttAdapter();
+  if (!adapter.available) return updateMqttSubscriptionStatus(subscriptionId, "adapter_unavailable", adapter.error.message);
+
+  let runtime = mqttRuntimeSubscriptions.get(subscriptionId);
+  if (!runtime) {
+    const connected = await connectMqttSubscription(subscriptionId);
+    if (connected.status !== "connected") return connected;
+    runtime = mqttRuntimeSubscriptions.get(subscriptionId);
+  }
+
+  try {
+    await publishMqttMessage(runtime.client, subscription, value);
+    return updateMqttSubscriptionWrite(subscriptionId, value);
+  } catch (error) {
+    return updateMqttSubscriptionStatus(subscriptionId, "error", error.message);
+  }
+}
+
+function publishMqttMessage(client, subscription, value) {
+  return new Promise((resolve, reject) => {
+    client.publish(subscription.topic, String(value), { qos: subscription.qos, retain: false }, (error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
 }
 
 function waitForMqttConnect(client) {
@@ -708,6 +845,20 @@ function updateMqttSubscriptionStatus(subscriptionId, status, errorMessage = "",
   return subscription;
 }
 
+function updateMqttSubscriptionWrite(subscriptionId, value) {
+  const store = readGatewayStore();
+  const subscription = store.mqttSubscriptions.find((candidate) => candidate.id === subscriptionId);
+  if (!subscription) throw notFound("MQTT subscription not found");
+  subscription.status = "connected";
+  subscription.lastError = "";
+  subscription.lastWriteAt = new Date().toISOString();
+  subscription.lastWriteValue = String(value);
+  subscription.updatedAt = new Date().toISOString();
+  writeGatewayStore(store);
+  broadcastGatewaySnapshot();
+  return subscription;
+}
+
 function findMqttSubscription(subscriptionId) {
   const subscription = readGatewayStore().mqttSubscriptions.find((candidate) => candidate.id === subscriptionId);
   if (!subscription) throw notFound("MQTT subscription not found");
@@ -720,6 +871,39 @@ function loadMqttAdapter() {
   } catch (error) {
     return { available: false, error };
   }
+}
+
+function parseWriteEnabled(value) {
+  return value === true || value === "true" || value === "on" || value === "1";
+}
+
+function requireSafeWrite(target, body, protocol) {
+  if (!target.writeEnabled) {
+    const error = new Error(`${protocol} write-back is disabled for this mapping`);
+    error.status = 403;
+    throw error;
+  }
+
+  if (body?.confirmWrite !== true) {
+    const error = new Error(`${protocol} write-back requires explicit confirmation`);
+    error.status = 400;
+    throw error;
+  }
+
+  const value = body.value;
+  if (value === undefined || value === null || String(value).trim() === "") {
+    const error = new Error(`${protocol} write-back value is required`);
+    error.status = 400;
+    throw error;
+  }
+
+  if (String(value).length > 512) {
+    const error = new Error(`${protocol} write-back value exceeds 512 characters`);
+    error.status = 400;
+    throw error;
+  }
+
+  return String(value);
 }
 
 function saveAasVersion(body, role = "editor") {

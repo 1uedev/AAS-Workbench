@@ -4,11 +4,7 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Support write-back where safe.
-
-## Live OPC UA / MQTT Gateway Backend
-
-- [ ] Support write-back where safe.
+- [ ] Add semantic ID suggestions.
 
 ## AAS Semantic Mapper
 

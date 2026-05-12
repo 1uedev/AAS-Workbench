@@ -800,13 +800,13 @@ refreshGatewayBackendButton.addEventListener("click", refreshGatewayBackends);
 opcUaConnectionList.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-opcua-action]");
   if (!button) return;
-  await runOpcUaConnectionAction(button.dataset.opcuaAction, button.dataset.opcuaConnection);
+  await runOpcUaConnectionAction(button.dataset.opcuaAction, button.dataset.opcuaConnection, button.closest(".gateway-connection-card"));
 });
 
 mqttSubscriptionList.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-mqtt-action]");
   if (!button) return;
-  await runMqttSubscriptionAction(button.dataset.mqttAction, button.dataset.mqttSubscription);
+  await runMqttSubscriptionAction(button.dataset.mqttAction, button.dataset.mqttSubscription, button.closest(".gateway-connection-card"));
 });
 
 mappingForm.addEventListener("submit", (event) => {
@@ -2137,6 +2137,7 @@ function addGatewayMapping(mapping) {
       gatewayProperty("SourceAddress", mapping.sourceAddress),
       gatewayProperty("TargetProperty", mapping.targetProperty),
       gatewayProperty("SamplingInterval", mapping.samplingInterval, "xs:integer", "ms"),
+      gatewayProperty("WriteBackEnabled", mapping.writeEnabled === "on", "xs:boolean"),
     ],
   });
 
@@ -2169,6 +2170,7 @@ async function registerOpcUaConnection(mapping) {
       nodeId: mapping.sourceAddress,
       targetProperty: mapping.targetProperty,
       samplingInterval: mapping.samplingInterval,
+      writeEnabled: mapping.writeEnabled === "on",
     }),
   });
   const connection = await readApiResponse(response);
@@ -2186,6 +2188,7 @@ async function registerMqttSubscription(mapping) {
       topic: mapping.sourceAddress,
       targetProperty: mapping.targetProperty,
       samplingInterval: mapping.samplingInterval,
+      writeEnabled: mapping.writeEnabled === "on",
     }),
   });
   const subscription = await readApiResponse(response);
@@ -2335,6 +2338,7 @@ function renderOpcUaConnectionCard(connection) {
         <code>${escapeHtml(connection.endpoint)}</code>
         <code>${escapeHtml(connection.nodeId)}</code>
         <div>Sampling: ${escapeHtml(connection.samplingInterval)} ms | Last value: ${escapeHtml(lastValue)} | Read: ${escapeHtml(lastReadAt)}</div>
+        <div>Write-back: ${connection.writeEnabled ? "aktiv" : "gesperrt"}${connection.lastWriteAt ? ` | Last write: ${escapeHtml(connection.lastWriteValue)} (${escapeHtml(formatDateTime(connection.lastWriteAt))})` : ""}</div>
         ${connection.lastError ? `<div>Fehler: ${escapeHtml(connection.lastError)}</div>` : ""}
       </div>
       <div class="action-row">
@@ -2342,6 +2346,7 @@ function renderOpcUaConnectionCard(connection) {
         <button class="secondary-button" type="button" data-opcua-action="read" data-opcua-connection="${escapeHtml(connection.id)}">Wert lesen</button>
         <button class="secondary-button" type="button" data-opcua-action="disconnect" data-opcua-connection="${escapeHtml(connection.id)}">Trennen</button>
       </div>
+      ${renderGatewayWriteControls("opcua", connection)}
     </article>
   `;
 }
@@ -2358,6 +2363,7 @@ function renderMqttSubscriptionCard(subscription) {
         <code>${escapeHtml(subscription.brokerUrl)}</code>
         <code>${escapeHtml(subscription.topic)}</code>
         <div>QoS: ${escapeHtml(subscription.qos)} | Last message: ${escapeHtml(lastMessage)} | Received: ${escapeHtml(lastMessageAt)}</div>
+        <div>Write-back: ${subscription.writeEnabled ? "aktiv" : "gesperrt"}${subscription.lastWriteAt ? ` | Last publish: ${escapeHtml(subscription.lastWriteValue)} (${escapeHtml(formatDateTime(subscription.lastWriteAt))})` : ""}</div>
         ${subscription.lastTopic ? `<div>Last topic: ${escapeHtml(subscription.lastTopic)}</div>` : ""}
         ${subscription.lastError ? `<div>Fehler: ${escapeHtml(subscription.lastError)}</div>` : ""}
       </div>
@@ -2365,22 +2371,46 @@ function renderMqttSubscriptionCard(subscription) {
         <button class="secondary-button" type="button" data-mqtt-action="connect" data-mqtt-subscription="${escapeHtml(subscription.id)}">Abonnieren</button>
         <button class="secondary-button" type="button" data-mqtt-action="disconnect" data-mqtt-subscription="${escapeHtml(subscription.id)}">Trennen</button>
       </div>
+      ${renderGatewayWriteControls("mqtt", subscription)}
     </article>
   `;
 }
 
-async function runOpcUaConnectionAction(action, connectionId) {
+function renderGatewayWriteControls(protocol, item) {
+  if (!item.writeEnabled) {
+    return `<div class="gateway-write-locked">Write-back ist fuer dieses Mapping nicht aktiviert.</div>`;
+  }
+
+  const action = protocol === "opcua" ? "write" : "publish";
+  const dataAttribute = protocol === "opcua" ? "data-opcua-write-value" : "data-mqtt-write-value";
+  const buttonAttribute = protocol === "opcua" ? "data-opcua-action" : "data-mqtt-action";
+  const idAttribute = protocol === "opcua" ? "data-opcua-connection" : "data-mqtt-subscription";
+  const buttonLabel = protocol === "opcua" ? "Wert schreiben" : "Nachricht publishen";
+
+  return `
+    <div class="gateway-write-panel">
+      <input ${dataAttribute} placeholder="Write-back Wert" />
+      <button class="secondary-button" type="button" ${buttonAttribute}="${action}" ${idAttribute}="${escapeHtml(item.id)}">${buttonLabel}</button>
+    </div>
+  `;
+}
+
+async function runOpcUaConnectionAction(action, connectionId, card) {
   if (!connectionId) return;
   const labels = {
     connect: "Verbindung wird aufgebaut ...",
     read: "OPC UA Wert wird gelesen ...",
     disconnect: "Verbindung wird getrennt ...",
+    write: "OPC UA Wert wird geschrieben ...",
   };
   gatewayBackendStatus.textContent = labels[action] ?? "OPC UA Aktion wird ausgefuehrt ...";
 
   try {
+    const body = action === "write" ? getGatewayWriteBody(card, "[data-opcua-write-value]") : null;
     const response = await fetch(`/api/opcua/connections/${encodeURIComponent(connectionId)}/${action}`, {
       method: "POST",
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
     });
     const result = await readApiResponse(response);
     await refreshGatewayBackends();
@@ -2390,17 +2420,21 @@ async function runOpcUaConnectionAction(action, connectionId) {
   }
 }
 
-async function runMqttSubscriptionAction(action, subscriptionId) {
+async function runMqttSubscriptionAction(action, subscriptionId, card) {
   if (!subscriptionId) return;
   const labels = {
     connect: "MQTT Subscription wird verbunden ...",
     disconnect: "MQTT Subscription wird getrennt ...",
+    publish: "MQTT Nachricht wird gesendet ...",
   };
   mqttBackendStatus.textContent = labels[action] ?? "MQTT Aktion wird ausgefuehrt ...";
 
   try {
+    const body = action === "publish" ? getGatewayWriteBody(card, "[data-mqtt-write-value]") : null;
     const response = await fetch(`/api/mqtt/subscriptions/${encodeURIComponent(subscriptionId)}/${action}`, {
       method: "POST",
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
     });
     const result = await readApiResponse(response);
     await refreshGatewayBackends();
@@ -2408,6 +2442,13 @@ async function runMqttSubscriptionAction(action, subscriptionId) {
   } catch (error) {
     mqttBackendStatus.textContent = `MQTT Aktion fehlgeschlagen: ${error.message}`;
   }
+}
+
+function getGatewayWriteBody(card, selector) {
+  const input = card?.querySelector(selector);
+  const value = input?.value.trim();
+  if (!value) throw new Error("Write-back Wert ist erforderlich.");
+  return { value, confirmWrite: true };
 }
 
 function normalizeAasJson(json) {

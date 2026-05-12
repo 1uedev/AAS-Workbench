@@ -118,6 +118,11 @@
   - Broadcasts on OPC UA status/value updates and MQTT subscription/message updates
   - Gateway UI live stream status
   - Recent live values panel for OPC UA reads and MQTT messages
+- Added safe Gateway write-back:
+  - Write-back is disabled by default per mapping
+  - OPC UA write endpoint requires write-enabled mapping and explicit confirmation
+  - MQTT publish endpoint requires write-enabled mapping, explicit confirmation and wildcard-free topic
+  - Gateway UI renders write/publish controls only for write-enabled mappings
 - Added npm package metadata and installed Gateway adapter dependencies:
   - `node-opcua`
   - `mqtt`
@@ -185,6 +190,7 @@
   - MQTT subscription register/list/connect/disconnect API smoke test
   - Unified Gateway status API and UI summary on the Gateway route
   - Gateway live stream API and UI status on the Gateway route
+  - Gateway write-back safety checks for disabled mappings and MQTT wildcard topics
   - JSON/AASX export button states
   - AASX export click without console errors
   - Explorer tree expansion, node selection and JSON inspector updates

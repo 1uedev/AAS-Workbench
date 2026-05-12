@@ -53,7 +53,7 @@ Die Validierung prueft zentrale AAS-3.x-Regeln: Pflichtfelder, `modelType`, `idS
 
 Der manuelle Generator erstellt aus Asset-Daten, mehreren Submodels und mehreren Properties pro Submodel direkt eine AAS-Umgebung. Wiederverwendbare Submodel-Templates fuer Technical Data, Nameplate, Operational Data und Maintenance koennen eingefuegt und vorab geprueft werden. Eine Live-Vorschau zeigt vor der Erzeugung, welche AAS, Submodels und Properties entstehen.
 
-Das Gateway-Formular ergänzt die aktuell geladene AAS um ein `GatewayMapping`-Submodel. Darin werden Protokoll, Endpoint/Broker, OPC-UA-Node-ID oder MQTT-Topic, Ziel-Property und Sampling-Intervall abgelegt. OPC-UA- und MQTT-Mappings werden zusätzlich im lokalen Backend gespeichert. Der Gateway-Status fasst beide Protokolle zusammen und zeigt konfigurierte, aktive, getrennte und prüfbedürftige Mappings. Die Gateway-UI abonniert einen Live-Stream und zeigt zuletzt gelesene OPC-UA-Werte oder empfangene MQTT-Nachrichten ohne manuelles Aktualisieren. Wenn `node-opcua` installiert ist, kann der Backend-Service OPC-UA-Verbindungen öffnen, Werte lesen und den Status persistieren. Wenn `mqtt` installiert ist, kann der Backend-Service MQTT-Broker verbinden, Topics abonnieren und die letzte empfangene Nachricht speichern.
+Das Gateway-Formular ergänzt die aktuell geladene AAS um ein `GatewayMapping`-Submodel. Darin werden Protokoll, Endpoint/Broker, OPC-UA-Node-ID oder MQTT-Topic, Ziel-Property und Sampling-Intervall abgelegt. OPC-UA- und MQTT-Mappings werden zusätzlich im lokalen Backend gespeichert. Der Gateway-Status fasst beide Protokolle zusammen und zeigt konfigurierte, aktive, getrennte und prüfbedürftige Mappings. Die Gateway-UI abonniert einen Live-Stream und zeigt zuletzt gelesene OPC-UA-Werte oder empfangene MQTT-Nachrichten ohne manuelles Aktualisieren. Write-back ist standardmäßig gesperrt und nur fuer explizit aktivierte Mappings mit bestaetigter Write-/Publish-Aktion erlaubt. Wenn `node-opcua` installiert ist, kann der Backend-Service OPC-UA-Verbindungen öffnen, Werte lesen und sichere Werte schreiben. Wenn `mqtt` installiert ist, kann der Backend-Service MQTT-Broker verbinden, Topics abonnieren und Nachrichten auf exakte, wildcard-freie Topics publishen.
 
 ## Dashboard Builder
 
@@ -101,11 +101,13 @@ GET  /api/opcua/connections
 POST /api/opcua/connections
 POST /api/opcua/connections/:id/connect
 POST /api/opcua/connections/:id/read
+POST /api/opcua/connections/:id/write
 POST /api/opcua/connections/:id/disconnect
 GET  /api/mqtt
 GET  /api/mqtt/subscriptions
 POST /api/mqtt/subscriptions
 POST /api/mqtt/subscriptions/:id/connect
+POST /api/mqtt/subscriptions/:id/publish
 POST /api/mqtt/subscriptions/:id/disconnect
 ```
 
