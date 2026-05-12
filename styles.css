@@ -891,8 +891,52 @@ body[data-route="dashboard"] .app-shell {
 }
 
 .repository-card h3 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 0;
   font-size: 17px;
+}
+
+.asset-kind-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid #c8ded8;
+  border-radius: 999px;
+  background: #eef7f3;
+  color: #1e5f50;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.asset-kind-badge.type {
+  border-color: #d7cfec;
+  background: #f3f0fb;
+  color: #57418c;
+}
+
+.type-relation-panel {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid #d7ead5;
+  border-radius: 8px;
+  background: #f4fbf3;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.type-relation-panel strong {
+  color: var(--ink);
+}
+
+.type-relation-panel.attention {
+  border-color: #f0d6a8;
+  background: #fff8ea;
 }
 
 .repository-meta,

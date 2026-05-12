@@ -147,12 +147,23 @@
           <div class="form-section-title">Asset</div>
           <div class="form-grid">
             <label class="field">
+              <span>AAS Art</span>
+              <select name="assetKind">
+                <option value="Instance" selected>Instanz-AAS</option>
+                <option value="Type">Type-AAS</option>
+              </select>
+            </label>
+            <label class="field">
               <span>Asset ID</span>
               <input name="assetId" required placeholder="urn:example:asset:Pump-001" />
             </label>
             <label class="field">
               <span>Asset Name</span>
               <input name="assetName" required placeholder="Pump 001" />
+            </label>
+            <label class="field">
+              <span>Type-AAS Referenz</span>
+              <input name="typeAasId" placeholder="urn:example:type:Pump-Series-A:aas" />
             </label>
           </div>
           <div class="generator-template-panel">
@@ -281,6 +292,14 @@
             <label class="field">
               <span>Asset</span>
               <input id="repositoryAssetSearch" type="search" placeholder="Asset ID, AAS ID oder Name" />
+            </label>
+            <label class="field">
+              <span>AAS Art</span>
+              <select id="repositoryKindSearch">
+                <option value="">Alle</option>
+                <option value="Type">Type-AAS</option>
+                <option value="Instance">Instanz-AAS</option>
+              </select>
             </label>
             <label class="field">
               <span>Manufacturer</span>

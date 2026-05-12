@@ -1198,6 +1198,8 @@ function saveAasVersion(body, role = "editor") {
   const shell = payload.assetAdministrationShells[0];
   const globalAssetId = shell.assetInformation?.globalAssetId || shell.id;
   const idShort = shell.idShort || "AAS";
+  const assetKind = shell.assetInformation?.assetKind || "Instance";
+  const typeAasId = getReferenceValue(shell.derivedFrom);
   let asset = repository.assets.find((candidate) => candidate.globalAssetId === globalAssetId);
   const now = new Date().toISOString();
 
@@ -1224,6 +1226,8 @@ function saveAasVersion(body, role = "editor") {
   };
 
   asset.idShort = idShort;
+  asset.assetKind = assetKind;
+  asset.typeAasId = typeAasId;
   asset.updatedAt = now;
   asset.versions.push(versionRecord);
   asset.events.push({
@@ -1237,6 +1241,8 @@ function saveAasVersion(body, role = "editor") {
       role,
       shellId: shell.id,
       globalAssetId,
+      assetKind,
+      typeAasId,
     },
   });
 
@@ -1245,6 +1251,8 @@ function saveAasVersion(body, role = "editor") {
     id: asset.id,
     globalAssetId: asset.globalAssetId,
     idShort: asset.idShort,
+    assetKind: asset.assetKind,
+    typeAasId: asset.typeAasId,
     version,
     createdAt: versionRecord.createdAt,
   };
@@ -1270,6 +1278,8 @@ function listAssets() {
     id: asset.id,
     globalAssetId: asset.globalAssetId,
     idShort: asset.idShort,
+    assetKind: asset.assetKind,
+    typeAasId: asset.typeAasId,
     createdAt: asset.createdAt,
     updatedAt: asset.updatedAt,
     latestVersion: asset.versions.length,
@@ -1305,12 +1315,18 @@ function listEvents(assetId) {
   return findAsset(assetId).events;
 }
 
+function getReferenceValue(reference) {
+  return Array.isArray(reference?.keys) ? reference.keys.at(-1)?.value || "" : "";
+}
+
 function versionResponse(asset, version) {
   return {
     asset: {
       id: asset.id,
       globalAssetId: asset.globalAssetId,
       idShort: asset.idShort,
+      assetKind: asset.assetKind,
+      typeAasId: asset.typeAasId,
     },
     version: version.version,
     createdAt: version.createdAt,

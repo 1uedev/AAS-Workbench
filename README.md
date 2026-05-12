@@ -7,6 +7,7 @@ Ein kleines MVP für Asset Administration Shell Workflows.
 - Hauptseite mit Unterseiten fuer Import, Generator, Gateway, Repository, Dashboard und Explorer
 - AASX und AAS-JSON per Dateiauswahl oder Drag-and-Drop laden und prüfen
 - AAS manuell ueber einen Multi-Submodel-/Multi-Property-Generator mit Submodel-Templates und Vorschau erzeugen
+- Generator und Repository unterscheiden Type-AAS und Instanz-AAS inklusive `derivedFrom`-Referenz und Type-Abgleich
 - CSV- und Excel-Dateien (`.xlsx`) mit Mapping-Dialog und Batch-Optionen in eine einfache AAS-Struktur umwandeln
 - OPC-UA-, MQTT- und REST-API-Quellen als Gateway-Mapping-Submodel dokumentieren, im Backend speichern und per Service verbinden, lesen oder abonnieren
 - AAS versioniert in einem lokalen Repository speichern, laden, vergleichen, nach Asset/Manufacturer/Semantic ID/Submodel durchsuchen und Traceability Events anzeigen
@@ -51,7 +52,7 @@ Die Validierung prueft zentrale AAS-3.x-Regeln: Pflichtfelder, `modelType`, `idS
 
 ## Generator und Gateway
 
-Der manuelle Generator erstellt aus Asset-Daten, mehreren Submodels und mehreren Properties pro Submodel direkt eine AAS-Umgebung. Wiederverwendbare Submodel-Templates fuer Technical Data, Nameplate, Operational Data und Maintenance koennen eingefuegt und vorab geprueft werden. Eine Live-Vorschau zeigt vor der Erzeugung, welche AAS, Submodels und Properties entstehen.
+Der manuelle Generator erstellt aus Asset-Daten, mehreren Submodels und mehreren Properties pro Submodel direkt eine AAS-Umgebung. Dabei kann zwischen Type-AAS und Instanz-AAS unterschieden werden. Instanz-AAS koennen eine Type-AAS ueber `derivedFrom` referenzieren und speichern die Type-ID zusätzlich als `specificAssetId`. Wiederverwendbare Submodel-Templates fuer Technical Data, Nameplate, Operational Data und Maintenance koennen eingefuegt und vorab geprueft werden. Eine Live-Vorschau zeigt vor der Erzeugung, welche AAS, Submodels und Properties entstehen.
 
 Das Gateway-Formular ergänzt die aktuell geladene AAS um ein `GatewayMapping`-Submodel. Darin werden Protokoll, Endpoint/Broker/URL, OPC-UA-Node-ID, MQTT-Topic oder REST-JSON-Pfad, Ziel-Property und Sampling-Intervall abgelegt. OPC-UA-, MQTT- und REST-Mappings werden zusätzlich im lokalen Backend gespeichert. Der Gateway-Status fasst alle drei Protokolle zusammen und zeigt konfigurierte, aktive, getrennte und prüfbedürftige Mappings. Die Gateway-UI abonniert einen Live-Stream und zeigt zuletzt gelesene OPC-UA-Werte, empfangene MQTT-Nachrichten oder REST-API-Werte ohne manuelles Aktualisieren. Write-back ist standardmäßig gesperrt und nur fuer explizit aktivierte Mappings mit bestaetigter Write-/Publish-Aktion erlaubt. Wenn `node-opcua` installiert ist, kann der Backend-Service OPC-UA-Verbindungen öffnen, Werte lesen und sichere Werte schreiben. Wenn `mqtt` installiert ist, kann der Backend-Service MQTT-Broker verbinden, Topics abonnieren und Nachrichten auf exakte, wildcard-freie Topics publishen. REST-API-Mappings nutzen die Node-Laufzeit, lesen JSON-Werte per Pfad und senden Write-back als JSON per POST, PUT oder PATCH.
 
@@ -119,7 +120,7 @@ POST /api/rest/endpoints/:id/write
 Die Repository-Daten werden lokal in `data/repository.json` gespeichert. Diese Datei ist absichtlich nicht versioniert.
 Die Gateway-Konfiguration fuer OPC UA, MQTT und REST API wird lokal in `data/gateway.json` gespeichert. Diese Datei ist absichtlich nicht versioniert.
 Im Repository kann ein gespeichertes AAS ueber zwei Versionsauswahlen verglichen werden. Der Compare View zeigt Kennzahlen, Version-Metadaten und strukturelle Unterschiede fuer AAS, Submodels und Submodel Elements.
-Die Repository-Liste kann nach Asset-ID/AAS-ID/Name, Manufacturer-Werten, Semantic IDs und Submodel-ID oder `idShort` gefiltert werden. Dafuer wird die jeweils letzte gespeicherte Version des AAS ausgewertet.
+Die Repository-Liste kann nach Asset-ID/AAS-ID/Name, AAS-Art, Manufacturer-Werten, Semantic IDs und Submodel-ID oder `idShort` gefiltert werden. Dafuer wird die jeweils letzte gespeicherte Version des AAS ausgewertet. Instanz-AAS mit Type-AAS-Referenz zeigen einen kontrollierten Type-Abgleich: fehlende Submodels und Properties aus der Type-Struktur werden sichtbar gemacht, ohne Instanzdaten automatisch zu ueberschreiben.
 Die Repository-Rolle steuert den Zugriff: `Viewer` darf laden, vergleichen und Traceability Events ansehen; `Editor` und `Admin` duerfen zusaetzlich neue AAS-Versionen speichern. Die Rolle wird als `X-Workbench-Role` an die API gesendet, und der Server blockiert Schreibzugriffe fuer read-only Rollen.
 Der Event-View zeigt gespeicherte Traceability Events mit Version, Zeitpunkt, Bearbeiter, Rolle, Asset-ID und Shell-ID.
 
@@ -156,5 +157,6 @@ Jedes Beispiel ist als `.json` und als importierbares `.aasx` vorhanden.
 ## Nächste sinnvolle Ausbaustufen
 
 - Submodel-Template-Katalog und semantische Mapping-Hilfen
+- Gefuehrte Type-to-Instance-Sync-Vorschlaege fuer fehlende Submodels/Properties
 - Document-Intelligence-Import fuer technische Daten und Zertifikate
 - Automatisierte Browser- und Import-/Export-Tests

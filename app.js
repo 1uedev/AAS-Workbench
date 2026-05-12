@@ -71,6 +71,7 @@ const repositoryStatus = document.querySelector("#repositoryStatus");
 const repositoryList = document.querySelector("#repositoryList");
 const repositoryEvents = document.querySelector("#repositoryEvents");
 const repositoryAssetSearch = document.querySelector("#repositoryAssetSearch");
+const repositoryKindSearch = document.querySelector("#repositoryKindSearch");
 const repositoryManufacturerSearch = document.querySelector("#repositoryManufacturerSearch");
 const repositorySemanticSearch = document.querySelector("#repositorySemanticSearch");
 const repositorySubmodelSearch = document.querySelector("#repositorySubmodelSearch");
@@ -674,8 +675,9 @@ repositoryForm.addEventListener("submit", async (event) => {
 
 refreshRepositoryButton.addEventListener("click", refreshRepository);
 
-[repositoryAssetSearch, repositoryManufacturerSearch, repositorySemanticSearch, repositorySubmodelSearch].forEach((input) => {
+[repositoryAssetSearch, repositoryKindSearch, repositoryManufacturerSearch, repositorySemanticSearch, repositorySubmodelSearch].forEach((input) => {
   input.addEventListener("input", renderFilteredRepositoryList);
+  input.addEventListener("change", renderFilteredRepositoryList);
 });
 
 repositorySearchForm.addEventListener("reset", () => window.setTimeout(renderFilteredRepositoryList));
@@ -917,6 +919,8 @@ function renderGeneratorPreview() {
   const formData = new FormData(manualGeneratorForm);
   const assetId = String(formData.get("assetId") ?? "").trim();
   const assetName = String(formData.get("assetName") ?? "").trim();
+  const assetKind = normalizeGeneratorAssetKind(formData.get("assetKind"));
+  const typeAasId = String(formData.get("typeAasId") ?? "").trim();
   const submodels = [...submodelBuilder.querySelectorAll(".submodel-editor")].map((submodelEditor) => {
     const submodelName = submodelEditor.querySelector("[data-field='submodelName']").value.trim();
     const explicitSubmodelId = submodelEditor.querySelector("[data-field='submodelId']").value.trim();
@@ -936,11 +940,17 @@ function renderGeneratorPreview() {
   });
   const propertyCount = submodels.reduce((count, submodel) => count + submodel.properties.length, 0);
   const assetLabel = assetName || assetId || "Noch kein Asset";
+  const typeRelationText =
+    assetKind === "Instance" && typeAasId
+      ? ` | referenziert Type-AAS ${typeAasId}`
+      : assetKind === "Type"
+        ? " | dient als Type-AAS Vorlage"
+        : "";
 
   generatorPreview.innerHTML = `
     <div class="preview-card">
       <h3>${escapeHtml(assetLabel)}</h3>
-      <p>${escapeHtml(assetId || "Asset ID fehlt noch")} | ${submodels.length} Submodel | ${propertyCount} Properties</p>
+      <p>${escapeHtml(assetId || "Asset ID fehlt noch")} | ${escapeHtml(formatAssetKind(assetKind))} | ${submodels.length} Submodel | ${propertyCount} Properties${escapeHtml(typeRelationText)}</p>
     </div>
     ${submodels
       .map((submodel) => {
@@ -1054,6 +1064,8 @@ function buildPackageFromGenerator() {
   const formData = new FormData(manualGeneratorForm);
   const assetId = String(formData.get("assetId") ?? "").trim();
   const assetName = String(formData.get("assetName") ?? "").trim();
+  const assetKind = normalizeGeneratorAssetKind(formData.get("assetKind"));
+  const typeAasId = String(formData.get("typeAasId") ?? "").trim();
   if (!assetId || !assetName) {
     throw new Error("Asset ID und Asset Name sind Pflichtfelder.");
   }
@@ -1091,7 +1103,7 @@ function buildPackageFromGenerator() {
     throw new Error("Mindestens eine Property ist erforderlich.");
   }
 
-  return recordsToAasPackage(records);
+  return recordsToAasPackage(records, { assetKind, typeAasId });
 }
 
 function refreshDashboardCatalog() {
@@ -1474,7 +1486,7 @@ async function refreshRepository() {
   try {
     repositoryStatus.textContent = "Repository wird geladen ...";
     const response = await fetch("/api/aas", { headers: repositoryHeaders() });
-    repositoryAssets = await enrichRepositoryAssets(await readApiResponse(response));
+    repositoryAssets = annotateTypeRelations(await enrichRepositoryAssets(await readApiResponse(response)));
     renderFilteredRepositoryList();
     if (selectedRepositoryEventAssetId && repositoryAssets.some((asset) => asset.id === selectedRepositoryEventAssetId)) {
       await loadRepositoryEvents(selectedRepositoryEventAssetId, { silent: true });
@@ -1493,6 +1505,7 @@ async function enrichRepositoryAssets(assets) {
         const payload = normalizeAasJson(latestVersion.payload);
         return {
           ...asset,
+          latestPayload: payload,
           searchIndex: buildRepositorySearchIndex(asset, payload),
         };
       } catch (error) {
@@ -1516,6 +1529,7 @@ function clearRepositorySearch(event) {
   event.preventDefault();
   repositorySearchForm.reset();
   repositoryAssetSearch.value = "";
+  repositoryKindSearch.value = "";
   repositoryManufacturerSearch.value = "";
   repositorySemanticSearch.value = "";
   repositorySubmodelSearch.value = "";
@@ -1527,6 +1541,7 @@ function filterRepositoryAssets(assets) {
   return assets.filter((asset) => {
     const searchIndex = asset.searchIndex ?? buildRepositorySearchIndex(asset);
     return (
+      matchesRepositoryKind(searchIndex.assetKind, queries.kind) &&
       matchesRepositoryQuery(searchIndex.assetText, queries.asset) &&
       matchesRepositoryQuery(searchIndex.manufacturerText, queries.manufacturer) &&
       matchesRepositoryQuery(searchIndex.semanticText, queries.semanticId) &&
@@ -1538,6 +1553,7 @@ function filterRepositoryAssets(assets) {
 function getRepositorySearchQueries() {
   return {
     asset: repositoryAssetSearch.value.trim(),
+    kind: repositoryKindSearch.value.trim(),
     manufacturer: repositoryManufacturerSearch.value.trim(),
     semanticId: repositorySemanticSearch.value.trim(),
     submodel: repositorySubmodelSearch.value.trim(),
@@ -1554,6 +1570,10 @@ function matchesRepositoryQuery(text, query) {
   return terms.every((term) => text.includes(term));
 }
 
+function matchesRepositoryKind(assetKind, query) {
+  return !query || assetKind === query;
+}
+
 function formatRepositoryStatus(totalCount, filteredCount) {
   if (totalCount === 0) return "Repository ist erreichbar, aber noch leer.";
   if (hasRepositorySearch()) return `${filteredCount} von ${totalCount} AAS gefunden.`;
@@ -1565,12 +1585,18 @@ function buildRepositorySearchIndex(asset, aasPackage = {}) {
   const manufacturerTerms = new Set();
   const semanticTerms = new Set();
   const submodelTerms = new Set();
+  const typeAasIds = new Set([asset.typeAasId].filter(Boolean));
+  let assetKind = asset.assetKind || "";
 
   for (const shell of aasPackage.assetAdministrationShells ?? []) {
+    assetKind = shell.assetInformation?.assetKind || assetKind;
+    getAasTypeReferences(shell).forEach((typeAasId) => typeAasIds.add(typeAasId));
     addSearchValues(assetTerms, [
       shell.id,
       shell.idShort,
+      shell.assetInformation?.assetKind,
       shell.assetInformation?.globalAssetId,
+      ...getAasTypeReferences(shell),
       ...(shell.assetInformation?.specificAssetIds ?? []).flatMap((specificAssetId) => [
         specificAssetId.name,
         specificAssetId.value,
@@ -1598,7 +1624,109 @@ function buildRepositorySearchIndex(asset, aasPackage = {}) {
     manufacturers: sortSearchValues(manufacturerTerms),
     semanticIds: sortSearchValues(semanticTerms),
     submodels: sortSearchValues(submodelTerms),
+    assetKind: assetKind || "Instance",
+    typeAasIds: sortSearchValues(typeAasIds),
   };
+}
+
+function annotateTypeRelations(assets) {
+  const typeAssetsByAasId = new Map();
+  for (const asset of assets) {
+    const searchIndex = asset.searchIndex ?? buildRepositorySearchIndex(asset, asset.latestPayload);
+    if (searchIndex.assetKind !== "Type") continue;
+    const shell = getPrimaryShell(asset.latestPayload);
+    [shell?.id, shell?.assetInformation?.globalAssetId, asset.globalAssetId]
+      .filter(Boolean)
+      .forEach((id) => typeAssetsByAasId.set(id, asset));
+  }
+
+  return assets.map((asset) => {
+    const searchIndex = asset.searchIndex ?? buildRepositorySearchIndex(asset, asset.latestPayload);
+    if (searchIndex.assetKind !== "Instance" || searchIndex.typeAasIds.length === 0) {
+      return asset;
+    }
+
+    const typeAasId = searchIndex.typeAasIds[0];
+    const typeAsset = typeAssetsByAasId.get(typeAasId);
+    return {
+      ...asset,
+      typeRelation: typeAsset
+        ? {
+            status: "linked",
+            typeAasId,
+            typeAssetIdShort: typeAsset.idShort,
+            conformance: compareTypeToInstance(typeAsset.latestPayload, asset.latestPayload),
+          }
+        : {
+            status: "missing_type",
+            typeAasId,
+          },
+    };
+  });
+}
+
+function compareTypeToInstance(typePackage, instancePackage) {
+  const typeSubmodels = indexSubmodelsByIdShort(typePackage);
+  const instanceSubmodels = indexSubmodelsByIdShort(instancePackage);
+  const missingSubmodels = [];
+  const missingElements = [];
+
+  for (const [idShort, typeSubmodel] of typeSubmodels) {
+    const instanceSubmodel = instanceSubmodels.get(idShort);
+    if (!instanceSubmodel) {
+      missingSubmodels.push(idShort);
+      continue;
+    }
+
+    const instanceElementPaths = collectElementIdShortPaths(instanceSubmodel.submodelElements ?? []);
+    for (const elementPath of collectElementIdShortPaths(typeSubmodel.submodelElements ?? [])) {
+      if (!instanceElementPaths.has(elementPath)) {
+        missingElements.push(`${idShort}/${elementPath}`);
+      }
+    }
+  }
+
+  return {
+    missingSubmodels,
+    missingElements,
+  };
+}
+
+function indexSubmodelsByIdShort(aasPackage = {}) {
+  const submodels = new Map();
+  for (const submodel of aasPackage.submodels ?? []) {
+    const idShort = submodel.idShort || toIdShort(submodel.id);
+    if (idShort) submodels.set(idShort, submodel);
+  }
+  return submodels;
+}
+
+function collectElementIdShortPaths(elements = [], prefix = []) {
+  const paths = new Set();
+  for (const element of elements) {
+    const label = element.idShort || element.modelType || "Element";
+    const path = [...prefix, label];
+    paths.add(path.join("/"));
+    for (const child of getElementChildren(element)) {
+      collectElementIdShortPaths([child], path).forEach((childPath) => paths.add(childPath));
+    }
+  }
+  return paths;
+}
+
+function getPrimaryShell(aasPackage = {}) {
+  return aasPackage.assetAdministrationShells?.[0] ?? null;
+}
+
+function getAasTypeReferences(shell = {}) {
+  const references = new Set(getReferenceValues(shell.derivedFrom));
+  for (const specificAssetId of shell.assetInformation?.specificAssetIds ?? []) {
+    const name = normalizeSearchText([specificAssetId.name]);
+    if (name.includes("typeaas") || name.includes("type-aas") || name === "type") {
+      addSearchValues(references, [specificAssetId.value]);
+    }
+  }
+  return [...references];
 }
 
 function collectRepositoryElementSearch(element, manufacturerTerms) {
@@ -1739,6 +1867,8 @@ function renderRepositoryEvent(event) {
       <div>${escapeHtml(event.message ?? "")}</div>
       <code>${escapeHtml(metadata.globalAssetId ?? "")}</code>
       <code>${escapeHtml(metadata.shellId ?? "")}</code>
+      ${metadata.assetKind ? `<div class="repository-meta">AAS Art: ${escapeHtml(formatAssetKind(metadata.assetKind))}</div>` : ""}
+      ${metadata.typeAasId ? `<div class="repository-meta">Type-AAS: ${escapeHtml(metadata.typeAasId)}</div>` : ""}
       ${metadata.role ? `<div class="repository-meta">Role: ${escapeHtml(metadata.role)}</div>` : ""}
     </article>
   `;
@@ -1760,6 +1890,7 @@ function renderRepositoryList(assets) {
 
 function renderRepositoryCard(asset) {
   const versions = Array.from({ length: asset.latestVersion }, (_, index) => index + 1);
+  const searchIndex = asset.searchIndex ?? buildRepositorySearchIndex(asset, asset.latestPayload);
   const compareControls =
     versions.length > 1
       ? `
@@ -1783,10 +1914,14 @@ function renderRepositoryCard(asset) {
 
   return `
     <article class="repository-card">
-      <h3>${escapeHtml(asset.idShort)}</h3>
+      <h3>
+        <span class="asset-kind-badge ${escapeHtml(searchIndex.assetKind.toLowerCase())}">${escapeHtml(formatAssetKind(searchIndex.assetKind))}</span>
+        ${escapeHtml(asset.idShort)}
+      </h3>
       <div class="repository-meta">${escapeHtml(asset.globalAssetId)}</div>
       <div class="repository-meta">Latest Version: ${asset.latestVersion} | Updated: ${formatDateTime(asset.updatedAt)}</div>
       ${renderRepositorySearchMeta(asset)}
+      ${renderTypeRelation(asset)}
       <div class="version-list">
         ${versions
           .map(
@@ -1811,9 +1946,40 @@ function renderRepositorySearchMeta(asset) {
   const searchIndex = asset.searchIndex ?? buildRepositorySearchIndex(asset);
   return `
     <div class="repository-search-meta">
+      <div><strong>AAS Art:</strong> ${escapeHtml(formatAssetKind(searchIndex.assetKind))}</div>
+      <div><strong>Type-Referenz:</strong> ${escapeHtml(formatSearchPreview(searchIndex.typeAasIds, "keine"))}</div>
       <div><strong>Manufacturer:</strong> ${escapeHtml(formatSearchPreview(searchIndex.manufacturers, "nicht gefunden"))}</div>
       <div><strong>Submodels:</strong> ${escapeHtml(formatSearchPreview(searchIndex.submodels, "keine Submodels"))}</div>
       <div><strong>Semantic IDs:</strong> ${escapeHtml(formatSearchPreview(searchIndex.semanticIds, "keine Semantic IDs"))}</div>
+    </div>
+  `;
+}
+
+function renderTypeRelation(asset) {
+  const relation = asset.typeRelation;
+  if (!relation) return "";
+
+  if (relation.status === "missing_type") {
+    return `
+      <div class="type-relation-panel attention">
+        <strong>Type-AAS Referenz</strong>
+        <span>${escapeHtml(relation.typeAasId)} ist im Repository noch nicht vorhanden.</span>
+      </div>
+    `;
+  }
+
+  const missingSubmodels = relation.conformance?.missingSubmodels ?? [];
+  const missingElements = relation.conformance?.missingElements ?? [];
+  const isComplete = missingSubmodels.length === 0 && missingElements.length === 0;
+  const missingPreview = [...missingSubmodels, ...missingElements].slice(0, 4).join(", ");
+  return `
+    <div class="type-relation-panel ${isComplete ? "complete" : "attention"}">
+      <strong>Type-Abgleich: ${escapeHtml(relation.typeAssetIdShort || relation.typeAasId)}</strong>
+      <span>${
+        isComplete
+          ? "Instanz deckt die erwartete Type-Struktur ab."
+          : `${missingSubmodels.length} Submodel und ${missingElements.length} Properties fehlen.${missingPreview ? ` (${escapeHtml(missingPreview)})` : ""}`
+      }</span>
     </div>
   `;
 }
@@ -2701,7 +2867,13 @@ function normalizeBatchOptions(options = {}) {
     assetMode: options.assetMode === "singleAsset" ? "singleAsset" : "byAssetId",
     duplicateMode: ["skip", "replace"].includes(options.duplicateMode) ? options.duplicateMode : "keep",
     skipEmptyValues: options.skipEmptyValues === true,
+    assetKind: normalizeGeneratorAssetKind(options.assetKind),
+    typeAasId: String(options.typeAasId ?? "").trim(),
   };
+}
+
+function normalizeGeneratorAssetKind(value) {
+  return value === "Type" ? "Type" : "Instance";
 }
 
 function recordsToAasPackage(records, options = {}) {
@@ -2718,16 +2890,28 @@ function recordsToAasPackage(records, options = {}) {
       batchOptions.assetMode === "singleAsset" ? `${assetId}:submodel:${toIdShort(submodelName)}` : record.submodelId;
 
     if (!shellMap.has(assetId)) {
-      shellMap.set(assetId, {
+      const shell = {
         modelType: "AssetAdministrationShell",
         id: `${assetId}:aas`,
         idShort: toIdShort(assetName),
         assetInformation: {
-          assetKind: "Instance",
+          assetKind: batchOptions.assetKind,
           globalAssetId: assetId,
         },
         submodels: [],
-      });
+      };
+
+      if (batchOptions.assetKind === "Instance" && batchOptions.typeAasId) {
+        shell.derivedFrom = modelReferenceTo("AssetAdministrationShell", batchOptions.typeAasId);
+        shell.assetInformation.specificAssetIds = [
+          {
+            name: "TypeAasId",
+            value: batchOptions.typeAasId,
+          },
+        ];
+      }
+
+      shellMap.set(assetId, shell);
     }
 
     if (!submodelMap.has(submodelId)) {
@@ -3039,6 +3223,12 @@ function validateAasPackage(aasPackage) {
     validateAssetInformation(shell.assetInformation, `${path}.assetInformation`, issues, {
       referenceContext,
       semanticContext,
+    });
+    validateReferenceIfPresent(shell.derivedFrom, `${path}.derivedFrom`, issues, {
+      expectedKeyType: "AssetAdministrationShell",
+      expectedReferenceType: "ModelReference",
+      referenceContext,
+      skipLocalTargetWarning: true,
     });
 
     if (shell.submodels !== undefined && !Array.isArray(shell.submodels)) {
@@ -4618,6 +4808,19 @@ function referenceTo(type, value) {
     type: type === "Submodel" ? "ModelReference" : "ExternalReference",
     keys: [{ type, value }],
   };
+}
+
+function modelReferenceTo(type, value) {
+  return {
+    type: "ModelReference",
+    keys: [{ type, value }],
+  };
+}
+
+function formatAssetKind(assetKind) {
+  if (assetKind === "Type") return "Type-AAS";
+  if (assetKind === "Instance") return "Instanz-AAS";
+  return assetKind || "AAS";
 }
 
 function toIdShort(value) {

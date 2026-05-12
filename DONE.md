@@ -221,3 +221,10 @@
   - Unified gateway status and live-value stream include REST runtime status and recent REST values
   - Gateway UI supports REST API mappings, backend status cards, read actions and guarded write-back
   - README updated with REST API gateway routes and behavior
+- Added Type-AAS / Instanz-AAS distinction:
+  - Generator supports `Type` and `Instance` assetKind selection
+  - Instanz-AAS can reference a Type-AAS via `derivedFrom` and `TypeAasId`
+  - Repository stores and lists AAS kind and Type-AAS references
+  - Repository search can filter by Type-AAS or Instanz-AAS
+  - Instanz-AAS cards show a controlled Type-Abgleich for missing Submodels/Properties
+  - Validation accepts and checks `derivedFrom` ModelReferences to AssetAdministrationShell
