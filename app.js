@@ -48,6 +48,8 @@ const templatePreview = document.querySelector("#templatePreview");
 const generatorPreview = document.querySelector("#generatorPreview");
 const runtimeDescriptorPanel = document.querySelector("#runtimeDescriptorPanel");
 const runtimeGuidance = document.querySelector("#runtimeGuidance");
+const proactiveWorkflowPanel = document.querySelector("#proactiveWorkflowPanel");
+const proactiveWorkflowGuidance = document.querySelector("#proactiveWorkflowGuidance");
 const dashboardElementSelect = document.querySelector("#dashboardElementSelect");
 const dashboardWidgetType = document.querySelector("#dashboardWidgetType");
 const dashboardLiveToggle = document.querySelector("#dashboardLiveToggle");
@@ -1002,6 +1004,7 @@ function renderGeneratorPreview() {
   const runtimeType = normalizeAasRuntimeType(formData.get("runtimeType"));
   const typeAasId = String(formData.get("typeAasId") ?? "").trim();
   const runtimeDescriptor = getGeneratorRuntimeDescriptor(formData);
+  const proactiveWorkflow = getGeneratorProactiveWorkflow(formData);
   const submodels = [...submodelBuilder.querySelectorAll(".submodel-editor")].map((submodelEditor) => {
     const submodelName = submodelEditor.querySelector("[data-field='submodelName']").value.trim();
     const explicitSubmodelId = submodelEditor.querySelector("[data-field='submodelId']").value.trim();
@@ -1029,6 +1032,8 @@ function renderGeneratorPreview() {
         : "";
   const runtimeGuidanceState = getRuntimeDescriptorGuidanceState(runtimeType, runtimeDescriptor);
   renderRuntimeGuidance(runtimeGuidanceState);
+  const proactiveWorkflowState = getProactiveWorkflowGuidanceState(runtimeType, proactiveWorkflow);
+  renderProactiveWorkflowGuidance(proactiveWorkflowState);
 
   generatorPreview.innerHTML = `
     <div class="preview-card">
@@ -1036,6 +1041,7 @@ function renderGeneratorPreview() {
       <p>${escapeHtml(assetId || "Asset ID fehlt noch")} | ${escapeHtml(formatAssetKind(assetKind))} | ${escapeHtml(formatAasRuntimeType(runtimeType))} | ${submodels.length} Submodel | ${propertyCount} Properties${escapeHtml(typeRelationText)}</p>
     </div>
     ${renderRuntimePreviewCard(runtimeGuidanceState)}
+    ${renderProactiveWorkflowPreviewCard(proactiveWorkflowState)}
     ${submodels
       .map((submodel) => {
         const properties = submodel.properties.length
@@ -1064,6 +1070,15 @@ function getGeneratorRuntimeDescriptor(formData = new FormData(manualGeneratorFo
     serviceName: String(formData.get("runtimeServiceName") ?? "").trim(),
     sourceAddress: String(formData.get("runtimeSourceAddress") ?? "").trim(),
     samplingInterval: String(formData.get("runtimeSamplingInterval") ?? "").trim(),
+  };
+}
+
+function getGeneratorProactiveWorkflow(formData = new FormData(manualGeneratorForm)) {
+  return {
+    workflowName: String(formData.get("proactiveWorkflowName") ?? "").trim() || "AutonomousMaintenanceWorkflow",
+    triggerEvent: String(formData.get("proactiveTriggerEvent") ?? "").trim() || "RuntimeStateChanged",
+    capabilityName: String(formData.get("proactiveCapabilityName") ?? "").trim() || "AutonomousDecision",
+    operationName: String(formData.get("proactiveOperationName") ?? "").trim() || "CreateMaintenanceTask",
   };
 }
 
@@ -1111,6 +1126,46 @@ function renderRuntimeGuidance(state) {
 }
 
 function renderRuntimePreviewCard(state) {
+  if (!state.visible) return "";
+  return `
+    <div class="preview-card runtime-preview-card ${escapeHtml(state.status)}">
+      <h4>${escapeHtml(state.title)}</h4>
+      <div class="preview-tags">
+        ${state.items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function getProactiveWorkflowGuidanceState(runtimeType, workflow) {
+  const visible = runtimeType === "Type3Proactive";
+  return {
+    visible,
+    status: visible ? "ready" : "neutral",
+    title: visible ? "Proaktives Interaktionsmodell" : "Kein proaktiver Workflow",
+    items: visible
+      ? [
+          `Event: ${workflow.triggerEvent}`,
+          `Capability: ${workflow.capabilityName}`,
+          `Operation: ${workflow.operationName}`,
+        ]
+      : [],
+    workflow,
+  };
+}
+
+function renderProactiveWorkflowGuidance(state) {
+  proactiveWorkflowPanel.hidden = !state.visible;
+  proactiveWorkflowGuidance.className = `runtime-guidance ${state.status}`;
+  proactiveWorkflowGuidance.innerHTML = state.visible
+    ? `
+      <strong>${escapeHtml(state.title)}</strong>
+      <div>${state.items.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
+    `
+    : "";
+}
+
+function renderProactiveWorkflowPreviewCard(state) {
   if (!state.visible) return "";
   return `
     <div class="preview-card runtime-preview-card ${escapeHtml(state.status)}">
@@ -1216,6 +1271,7 @@ function buildPackageFromGenerator() {
   const runtimeType = normalizeAasRuntimeType(formData.get("runtimeType"));
   const typeAasId = String(formData.get("typeAasId") ?? "").trim();
   const runtimeDescriptor = getGeneratorRuntimeDescriptor(formData);
+  const proactiveWorkflow = getGeneratorProactiveWorkflow(formData);
   if (!assetId || !assetName) {
     throw new Error("Asset ID und Asset Name sind Pflichtfelder.");
   }
@@ -1255,6 +1311,7 @@ function buildPackageFromGenerator() {
 
   const aasPackage = recordsToAasPackage(records, { assetKind, runtimeType, typeAasId });
   addRuntimeServiceDescriptor(aasPackage, runtimeType, runtimeDescriptor);
+  addProactiveInteractionWorkflow(aasPackage, runtimeType, proactiveWorkflow);
   return aasPackage;
 }
 
@@ -1329,6 +1386,96 @@ function inferRuntimeProtocol(endpoint) {
   if (value.startsWith("http://") || value.startsWith("https://")) return "REST API";
   if (value.startsWith("ws://") || value.startsWith("wss://")) return "WebSocket";
   return "Service";
+}
+
+function addProactiveInteractionWorkflow(aasPackage, runtimeType, workflow) {
+  if (runtimeType !== "Type3Proactive") return;
+  const shell = aasPackage.assetAdministrationShells?.[0];
+  if (!shell) return;
+
+  const assetId = shell.assetInformation?.globalAssetId ?? shell.id ?? "asset";
+  const submodelId = `${assetId}:submodel:ProactiveInteractionWorkflow`;
+  const workflowName = toIdShort(workflow.workflowName);
+  const triggerEvent = toIdShort(workflow.triggerEvent);
+  const capabilityName = toIdShort(workflow.capabilityName);
+  const operationName = toIdShort(workflow.operationName);
+
+  aasPackage.submodels = Array.isArray(aasPackage.submodels) ? aasPackage.submodels : [];
+  const existingIndex = aasPackage.submodels.findIndex((candidate) => candidate.id === submodelId);
+  const submodel = {
+    modelType: "Submodel",
+    id: submodelId,
+    idShort: "ProactiveInteractionWorkflow",
+    semanticId: referenceTo("ConceptDescription", "https://admin-shell.io/idta/ProactiveInteractionWorkflow"),
+    submodelElements: [
+      {
+        modelType: "Property",
+        idShort: "WorkflowState",
+        valueType: "xs:string",
+        value: "Monitoring",
+        semanticId: referenceTo("ConceptDescription", "https://admin-shell.io/idta/WorkflowState"),
+      },
+      {
+        modelType: "SubmodelElementCollection",
+        idShort: workflowName,
+        semanticId: referenceTo("ConceptDescription", "https://admin-shell.io/idta/ProactiveWorkflow"),
+        value: [
+          {
+            modelType: "Capability",
+            idShort: capabilityName,
+            semanticId: referenceTo("ConceptDescription", "https://admin-shell.io/idta/AutonomousCapability"),
+          },
+          {
+            modelType: "BasicEventElement",
+            idShort: triggerEvent,
+            semanticId: referenceTo("ConceptDescription", "https://admin-shell.io/idta/WorkflowEvent"),
+            observed: modelReferenceToElement(submodelId, "Property", "WorkflowState"),
+            direction: "output",
+            state: "on",
+          },
+          {
+            modelType: "Operation",
+            idShort: operationName,
+            semanticId: referenceTo("ConceptDescription", "https://admin-shell.io/idta/WorkflowOperation"),
+            inputVariables: [operationVariable("Trigger", triggerEvent)],
+            outputVariables: [operationVariable("Decision", capabilityName)],
+          },
+        ],
+      },
+    ],
+  };
+
+  if (existingIndex >= 0) {
+    aasPackage.submodels[existingIndex] = submodel;
+  } else {
+    aasPackage.submodels.push(submodel);
+  }
+
+  shell.submodels = Array.isArray(shell.submodels) ? shell.submodels : [];
+  if (!shell.submodels.some((reference) => reference.keys?.at(-1)?.value === submodelId)) {
+    shell.submodels.push(referenceTo("Submodel", submodelId));
+  }
+}
+
+function operationVariable(idShort, value) {
+  return {
+    value: {
+      modelType: "Property",
+      idShort,
+      valueType: "xs:string",
+      value,
+    },
+  };
+}
+
+function modelReferenceToElement(submodelId, elementType, elementIdShort) {
+  return {
+    type: "ModelReference",
+    keys: [
+      { type: "Submodel", value: submodelId },
+      { type: elementType, value: elementIdShort },
+    ],
+  };
 }
 
 function refreshDashboardCatalog() {

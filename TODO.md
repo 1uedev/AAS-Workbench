@@ -4,11 +4,7 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add proactive interaction workflow model.
-
-## AAS Operating Types
-
-- [ ] Add proactive interaction workflow model.
+- [ ] Add guided Type-to-Instance sync proposals.
 
 ## AAS Type / Instance Modeling
 

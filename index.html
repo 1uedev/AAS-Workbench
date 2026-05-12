@@ -196,6 +196,28 @@
             </div>
             <div id="runtimeGuidance" class="runtime-guidance" aria-live="polite"></div>
           </div>
+          <div id="proactiveWorkflowPanel" class="proactive-workflow-panel" hidden>
+            <div class="form-section-title">Proaktive Interaktion</div>
+            <div class="form-grid">
+              <label class="field">
+                <span>Workflow Name</span>
+                <input name="proactiveWorkflowName" value="AutonomousMaintenanceWorkflow" />
+              </label>
+              <label class="field">
+                <span>Trigger Event</span>
+                <input name="proactiveTriggerEvent" value="RuntimeStateChanged" />
+              </label>
+              <label class="field">
+                <span>Capability</span>
+                <input name="proactiveCapabilityName" value="AutonomousDecision" />
+              </label>
+              <label class="field">
+                <span>Operation</span>
+                <input name="proactiveOperationName" value="CreateMaintenanceTask" />
+              </label>
+            </div>
+            <div id="proactiveWorkflowGuidance" class="runtime-guidance" aria-live="polite"></div>
+          </div>
           <div class="generator-template-panel">
             <div class="form-section-title">Submodel Templates</div>
             <div class="template-controls">

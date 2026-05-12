@@ -252,3 +252,9 @@
   - Generated AAS packages include entered runtime data as a `RuntimeServices` Submodel
   - Runtime descriptor properties include endpoint, protocol, service/source address and sampling interval
   - TODO now points to the proactive interaction workflow model
+- Added proactive interaction workflow model:
+  - Generator shows proactive workflow fields when Typ 3 is selected
+  - Generated Typ 3 AAS packages include a `ProactiveInteractionWorkflow` Submodel
+  - Workflow model contains `WorkflowState`, `BasicEventElement`, `Capability` and `Operation`
+  - Event observation references the local `WorkflowState` property through a ModelReference
+  - TODO now continues with guided Type-to-Instance sync proposals

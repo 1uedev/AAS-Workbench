@@ -560,6 +560,7 @@ body[data-route="dashboard"] .app-shell {
 
 .generator-template-panel,
 .runtime-descriptor-panel,
+.proactive-workflow-panel,
 .generator-preview-panel {
   display: grid;
   gap: 12px;
@@ -570,6 +571,10 @@ body[data-route="dashboard"] .app-shell {
 }
 
 .runtime-descriptor-panel[hidden] {
+  display: none;
+}
+
+.proactive-workflow-panel[hidden] {
   display: none;
 }
 
