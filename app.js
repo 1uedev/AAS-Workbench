@@ -72,6 +72,7 @@ const repositoryList = document.querySelector("#repositoryList");
 const repositoryEvents = document.querySelector("#repositoryEvents");
 const repositoryAssetSearch = document.querySelector("#repositoryAssetSearch");
 const repositoryKindSearch = document.querySelector("#repositoryKindSearch");
+const repositoryRuntimeSearch = document.querySelector("#repositoryRuntimeSearch");
 const repositoryManufacturerSearch = document.querySelector("#repositoryManufacturerSearch");
 const repositorySemanticSearch = document.querySelector("#repositorySemanticSearch");
 const repositorySubmodelSearch = document.querySelector("#repositorySubmodelSearch");
@@ -107,6 +108,21 @@ const repositoryRoleDescriptions = {
   viewer: "Viewer darf Repository-Eintraege laden, vergleichen und Traceability Events ansehen. Speichern ist gesperrt.",
   editor: "Editor darf Repository-Eintraege laden, vergleichen, Events ansehen und neue Versionen speichern.",
   admin: "Admin hat vollen Repository-Zugriff fuer diese lokale Workbench.",
+};
+
+const aasRuntimeTypes = {
+  Type1Passive: {
+    label: "Typ 1: Passive AAS",
+    shortLabel: "Typ 1 Passiv",
+  },
+  Type2Reactive: {
+    label: "Typ 2: Reaktive AAS",
+    shortLabel: "Typ 2 Reaktiv",
+  },
+  Type3Proactive: {
+    label: "Typ 3: Proaktive AAS",
+    shortLabel: "Typ 3 Proaktiv",
+  },
 };
 
 const targetColumns = [
@@ -675,10 +691,12 @@ repositoryForm.addEventListener("submit", async (event) => {
 
 refreshRepositoryButton.addEventListener("click", refreshRepository);
 
-[repositoryAssetSearch, repositoryKindSearch, repositoryManufacturerSearch, repositorySemanticSearch, repositorySubmodelSearch].forEach((input) => {
-  input.addEventListener("input", renderFilteredRepositoryList);
-  input.addEventListener("change", renderFilteredRepositoryList);
-});
+[repositoryAssetSearch, repositoryKindSearch, repositoryRuntimeSearch, repositoryManufacturerSearch, repositorySemanticSearch, repositorySubmodelSearch].forEach(
+  (input) => {
+    input.addEventListener("input", renderFilteredRepositoryList);
+    input.addEventListener("change", renderFilteredRepositoryList);
+  },
+);
 
 repositorySearchForm.addEventListener("reset", () => window.setTimeout(renderFilteredRepositoryList));
 clearRepositorySearchButton.addEventListener("click", clearRepositorySearch);
@@ -920,6 +938,7 @@ function renderGeneratorPreview() {
   const assetId = String(formData.get("assetId") ?? "").trim();
   const assetName = String(formData.get("assetName") ?? "").trim();
   const assetKind = normalizeGeneratorAssetKind(formData.get("assetKind"));
+  const runtimeType = normalizeAasRuntimeType(formData.get("runtimeType"));
   const typeAasId = String(formData.get("typeAasId") ?? "").trim();
   const submodels = [...submodelBuilder.querySelectorAll(".submodel-editor")].map((submodelEditor) => {
     const submodelName = submodelEditor.querySelector("[data-field='submodelName']").value.trim();
@@ -950,7 +969,7 @@ function renderGeneratorPreview() {
   generatorPreview.innerHTML = `
     <div class="preview-card">
       <h3>${escapeHtml(assetLabel)}</h3>
-      <p>${escapeHtml(assetId || "Asset ID fehlt noch")} | ${escapeHtml(formatAssetKind(assetKind))} | ${submodels.length} Submodel | ${propertyCount} Properties${escapeHtml(typeRelationText)}</p>
+      <p>${escapeHtml(assetId || "Asset ID fehlt noch")} | ${escapeHtml(formatAssetKind(assetKind))} | ${escapeHtml(formatAasRuntimeType(runtimeType))} | ${submodels.length} Submodel | ${propertyCount} Properties${escapeHtml(typeRelationText)}</p>
     </div>
     ${submodels
       .map((submodel) => {
@@ -1065,6 +1084,7 @@ function buildPackageFromGenerator() {
   const assetId = String(formData.get("assetId") ?? "").trim();
   const assetName = String(formData.get("assetName") ?? "").trim();
   const assetKind = normalizeGeneratorAssetKind(formData.get("assetKind"));
+  const runtimeType = normalizeAasRuntimeType(formData.get("runtimeType"));
   const typeAasId = String(formData.get("typeAasId") ?? "").trim();
   if (!assetId || !assetName) {
     throw new Error("Asset ID und Asset Name sind Pflichtfelder.");
@@ -1103,7 +1123,7 @@ function buildPackageFromGenerator() {
     throw new Error("Mindestens eine Property ist erforderlich.");
   }
 
-  return recordsToAasPackage(records, { assetKind, typeAasId });
+  return recordsToAasPackage(records, { assetKind, runtimeType, typeAasId });
 }
 
 function refreshDashboardCatalog() {
@@ -1530,6 +1550,7 @@ function clearRepositorySearch(event) {
   repositorySearchForm.reset();
   repositoryAssetSearch.value = "";
   repositoryKindSearch.value = "";
+  repositoryRuntimeSearch.value = "";
   repositoryManufacturerSearch.value = "";
   repositorySemanticSearch.value = "";
   repositorySubmodelSearch.value = "";
@@ -1542,6 +1563,7 @@ function filterRepositoryAssets(assets) {
     const searchIndex = asset.searchIndex ?? buildRepositorySearchIndex(asset);
     return (
       matchesRepositoryKind(searchIndex.assetKind, queries.kind) &&
+      matchesRepositoryRuntimeType(searchIndex.runtimeType, queries.runtimeType) &&
       matchesRepositoryQuery(searchIndex.assetText, queries.asset) &&
       matchesRepositoryQuery(searchIndex.manufacturerText, queries.manufacturer) &&
       matchesRepositoryQuery(searchIndex.semanticText, queries.semanticId) &&
@@ -1554,6 +1576,7 @@ function getRepositorySearchQueries() {
   return {
     asset: repositoryAssetSearch.value.trim(),
     kind: repositoryKindSearch.value.trim(),
+    runtimeType: repositoryRuntimeSearch.value.trim(),
     manufacturer: repositoryManufacturerSearch.value.trim(),
     semanticId: repositorySemanticSearch.value.trim(),
     submodel: repositorySubmodelSearch.value.trim(),
@@ -1574,6 +1597,10 @@ function matchesRepositoryKind(assetKind, query) {
   return !query || assetKind === query;
 }
 
+function matchesRepositoryRuntimeType(runtimeType, query) {
+  return !query || runtimeType === query;
+}
+
 function formatRepositoryStatus(totalCount, filteredCount) {
   if (totalCount === 0) return "Repository ist erreichbar, aber noch leer.";
   if (hasRepositorySearch()) return `${filteredCount} von ${totalCount} AAS gefunden.`;
@@ -1587,14 +1614,18 @@ function buildRepositorySearchIndex(asset, aasPackage = {}) {
   const submodelTerms = new Set();
   const typeAasIds = new Set([asset.typeAasId].filter(Boolean));
   let assetKind = asset.assetKind || "";
+  let runtimeType = asset.runtimeType || "";
 
   for (const shell of aasPackage.assetAdministrationShells ?? []) {
     assetKind = shell.assetInformation?.assetKind || assetKind;
+    runtimeType = getAasRuntimeType(shell) || runtimeType;
     getAasTypeReferences(shell).forEach((typeAasId) => typeAasIds.add(typeAasId));
     addSearchValues(assetTerms, [
       shell.id,
       shell.idShort,
       shell.assetInformation?.assetKind,
+      runtimeType,
+      formatAasRuntimeType(runtimeType),
       shell.assetInformation?.globalAssetId,
       ...getAasTypeReferences(shell),
       ...(shell.assetInformation?.specificAssetIds ?? []).flatMap((specificAssetId) => [
@@ -1625,6 +1656,7 @@ function buildRepositorySearchIndex(asset, aasPackage = {}) {
     semanticIds: sortSearchValues(semanticTerms),
     submodels: sortSearchValues(submodelTerms),
     assetKind: assetKind || "Instance",
+    runtimeType: normalizeAasRuntimeType(runtimeType),
     typeAasIds: sortSearchValues(typeAasIds),
   };
 }
@@ -1727,6 +1759,11 @@ function getAasTypeReferences(shell = {}) {
     }
   }
   return [...references];
+}
+
+function getAasRuntimeType(shell = {}) {
+  const extension = (shell.extensions ?? []).find((candidate) => candidate?.name === "AasRuntimeType");
+  return normalizeAasRuntimeType(extension?.value);
 }
 
 function collectRepositoryElementSearch(element, manufacturerTerms) {
@@ -1868,6 +1905,7 @@ function renderRepositoryEvent(event) {
       <code>${escapeHtml(metadata.globalAssetId ?? "")}</code>
       <code>${escapeHtml(metadata.shellId ?? "")}</code>
       ${metadata.assetKind ? `<div class="repository-meta">AAS Art: ${escapeHtml(formatAssetKind(metadata.assetKind))}</div>` : ""}
+      ${metadata.runtimeType ? `<div class="repository-meta">Betriebsart: ${escapeHtml(formatAasRuntimeType(metadata.runtimeType))}</div>` : ""}
       ${metadata.typeAasId ? `<div class="repository-meta">Type-AAS: ${escapeHtml(metadata.typeAasId)}</div>` : ""}
       ${metadata.role ? `<div class="repository-meta">Role: ${escapeHtml(metadata.role)}</div>` : ""}
     </article>
@@ -1916,6 +1954,7 @@ function renderRepositoryCard(asset) {
     <article class="repository-card">
       <h3>
         <span class="asset-kind-badge ${escapeHtml(searchIndex.assetKind.toLowerCase())}">${escapeHtml(formatAssetKind(searchIndex.assetKind))}</span>
+        <span class="runtime-type-badge ${escapeHtml(runtimeTypeClass(searchIndex.runtimeType))}">${escapeHtml(formatAasRuntimeTypeShort(searchIndex.runtimeType))}</span>
         ${escapeHtml(asset.idShort)}
       </h3>
       <div class="repository-meta">${escapeHtml(asset.globalAssetId)}</div>
@@ -1947,6 +1986,7 @@ function renderRepositorySearchMeta(asset) {
   return `
     <div class="repository-search-meta">
       <div><strong>AAS Art:</strong> ${escapeHtml(formatAssetKind(searchIndex.assetKind))}</div>
+      <div><strong>Betriebsart:</strong> ${escapeHtml(formatAasRuntimeType(searchIndex.runtimeType))}</div>
       <div><strong>Type-Referenz:</strong> ${escapeHtml(formatSearchPreview(searchIndex.typeAasIds, "keine"))}</div>
       <div><strong>Manufacturer:</strong> ${escapeHtml(formatSearchPreview(searchIndex.manufacturers, "nicht gefunden"))}</div>
       <div><strong>Submodels:</strong> ${escapeHtml(formatSearchPreview(searchIndex.submodels, "keine Submodels"))}</div>
@@ -2868,12 +2908,17 @@ function normalizeBatchOptions(options = {}) {
     duplicateMode: ["skip", "replace"].includes(options.duplicateMode) ? options.duplicateMode : "keep",
     skipEmptyValues: options.skipEmptyValues === true,
     assetKind: normalizeGeneratorAssetKind(options.assetKind),
+    runtimeType: normalizeAasRuntimeType(options.runtimeType),
     typeAasId: String(options.typeAasId ?? "").trim(),
   };
 }
 
 function normalizeGeneratorAssetKind(value) {
   return value === "Type" ? "Type" : "Instance";
+}
+
+function normalizeAasRuntimeType(value) {
+  return Object.prototype.hasOwnProperty.call(aasRuntimeTypes, value) ? value : "Type1Passive";
 }
 
 function recordsToAasPackage(records, options = {}) {
@@ -2894,6 +2939,7 @@ function recordsToAasPackage(records, options = {}) {
         modelType: "AssetAdministrationShell",
         id: `${assetId}:aas`,
         idShort: toIdShort(assetName),
+        extensions: [createAasExtension("AasRuntimeType", batchOptions.runtimeType)],
         assetInformation: {
           assetKind: batchOptions.assetKind,
           globalAssetId: assetId,
@@ -4817,10 +4863,30 @@ function modelReferenceTo(type, value) {
   };
 }
 
+function createAasExtension(name, value) {
+  return {
+    name,
+    valueType: "xs:string",
+    value: String(value ?? ""),
+  };
+}
+
 function formatAssetKind(assetKind) {
   if (assetKind === "Type") return "Type-AAS";
   if (assetKind === "Instance") return "Instanz-AAS";
   return assetKind || "AAS";
+}
+
+function formatAasRuntimeType(runtimeType) {
+  return aasRuntimeTypes[normalizeAasRuntimeType(runtimeType)].label;
+}
+
+function formatAasRuntimeTypeShort(runtimeType) {
+  return aasRuntimeTypes[normalizeAasRuntimeType(runtimeType)].shortLabel;
+}
+
+function runtimeTypeClass(runtimeType) {
+  return normalizeAasRuntimeType(runtimeType).toLowerCase();
 }
 
 function toIdShort(value) {

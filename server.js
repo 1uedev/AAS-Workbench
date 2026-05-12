@@ -11,6 +11,7 @@ const repositoryPath = path.join(dataDir, "repository.json");
 const port = Number(process.env.PORT || 8081);
 const writeRoles = new Set(["editor", "admin"]);
 const repositoryRoles = new Set(["viewer", "editor", "admin"]);
+const aasRuntimeTypes = new Set(["Type1Passive", "Type2Reactive", "Type3Proactive"]);
 const opcUaRuntimeConnections = new Map();
 const mqttRuntimeSubscriptions = new Map();
 const gatewayStreamClients = new Set();
@@ -1199,6 +1200,7 @@ function saveAasVersion(body, role = "editor") {
   const globalAssetId = shell.assetInformation?.globalAssetId || shell.id;
   const idShort = shell.idShort || "AAS";
   const assetKind = shell.assetInformation?.assetKind || "Instance";
+  const runtimeType = getAasRuntimeType(shell);
   const typeAasId = getReferenceValue(shell.derivedFrom);
   let asset = repository.assets.find((candidate) => candidate.globalAssetId === globalAssetId);
   const now = new Date().toISOString();
@@ -1227,6 +1229,7 @@ function saveAasVersion(body, role = "editor") {
 
   asset.idShort = idShort;
   asset.assetKind = assetKind;
+  asset.runtimeType = runtimeType;
   asset.typeAasId = typeAasId;
   asset.updatedAt = now;
   asset.versions.push(versionRecord);
@@ -1242,6 +1245,7 @@ function saveAasVersion(body, role = "editor") {
       shellId: shell.id,
       globalAssetId,
       assetKind,
+      runtimeType,
       typeAasId,
     },
   });
@@ -1252,6 +1256,7 @@ function saveAasVersion(body, role = "editor") {
     globalAssetId: asset.globalAssetId,
     idShort: asset.idShort,
     assetKind: asset.assetKind,
+    runtimeType: asset.runtimeType,
     typeAasId: asset.typeAasId,
     version,
     createdAt: versionRecord.createdAt,
@@ -1279,6 +1284,7 @@ function listAssets() {
     globalAssetId: asset.globalAssetId,
     idShort: asset.idShort,
     assetKind: asset.assetKind,
+    runtimeType: asset.runtimeType,
     typeAasId: asset.typeAasId,
     createdAt: asset.createdAt,
     updatedAt: asset.updatedAt,
@@ -1319,6 +1325,16 @@ function getReferenceValue(reference) {
   return Array.isArray(reference?.keys) ? reference.keys.at(-1)?.value || "" : "";
 }
 
+function getAasRuntimeType(shell) {
+  const runtimeType = getExtensionValue(shell, "AasRuntimeType");
+  return aasRuntimeTypes.has(runtimeType) ? runtimeType : "Type1Passive";
+}
+
+function getExtensionValue(entity, name) {
+  const extension = (entity?.extensions ?? []).find((candidate) => candidate?.name === name);
+  return String(extension?.value || "").trim();
+}
+
 function versionResponse(asset, version) {
   return {
     asset: {
@@ -1326,6 +1342,7 @@ function versionResponse(asset, version) {
       globalAssetId: asset.globalAssetId,
       idShort: asset.idShort,
       assetKind: asset.assetKind,
+      runtimeType: asset.runtimeType,
       typeAasId: asset.typeAasId,
     },
     version: version.version,

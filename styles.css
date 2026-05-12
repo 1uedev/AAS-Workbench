@@ -918,6 +918,31 @@ body[data-route="dashboard"] .app-shell {
   color: #57418c;
 }
 
+.runtime-type-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid #d9e1ea;
+  border-radius: 999px;
+  background: #f4f7fb;
+  color: #36556f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.runtime-type-badge.type2reactive {
+  border-color: #c7ddf0;
+  background: #edf7ff;
+  color: #235a88;
+}
+
+.runtime-type-badge.type3proactive {
+  border-color: #e8d4b8;
+  background: #fff6e8;
+  color: #73511e;
+}
+
 .type-relation-panel {
   display: grid;
   gap: 3px;

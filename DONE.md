@@ -228,3 +228,9 @@
   - Repository search can filter by Type-AAS or Instanz-AAS
   - Instanz-AAS cards show a controlled Type-Abgleich for missing Submodels/Properties
   - Validation accepts and checks `derivedFrom` ModelReferences to AssetAdministrationShell
+- Added passive/reactive/proactive AAS operating type classification:
+  - Generator captures Typ 1 passive, Typ 2 reactive or Typ 3 proactive Betriebsart
+  - AAS packages store the classification as `AasRuntimeType` extension
+  - Repository stores, displays and filters AAS operating type metadata
+  - Repository events include AAS operating type metadata
+  - README and TODO reflect the operating-type roadmap

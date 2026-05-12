@@ -154,6 +154,14 @@
               </select>
             </label>
             <label class="field">
+              <span>AAS Betriebsart</span>
+              <select name="runtimeType">
+                <option value="Type1Passive" selected>Typ 1: Passiv / dateibasiert</option>
+                <option value="Type2Reactive">Typ 2: Reaktiv / serverbasiert</option>
+                <option value="Type3Proactive">Typ 3: Proaktiv / autonom</option>
+              </select>
+            </label>
+            <label class="field">
               <span>Asset ID</span>
               <input name="assetId" required placeholder="urn:example:asset:Pump-001" />
             </label>
@@ -299,6 +307,15 @@
                 <option value="">Alle</option>
                 <option value="Type">Type-AAS</option>
                 <option value="Instance">Instanz-AAS</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Betriebsart</span>
+              <select id="repositoryRuntimeSearch">
+                <option value="">Alle</option>
+                <option value="Type1Passive">Typ 1: Passiv</option>
+                <option value="Type2Reactive">Typ 2: Reaktiv</option>
+                <option value="Type3Proactive">Typ 3: Proaktiv</option>
               </select>
             </label>
             <label class="field">

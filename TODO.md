@@ -4,7 +4,13 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add guided Type-to-Instance sync proposals.
+- [ ] Add runtime capability checks for Type 2/3 AAS.
+
+## AAS Operating Types
+
+- [ ] Add runtime capability checks for Type 2/3 AAS.
+- [ ] Add endpoint/service descriptor guidance for reactive AAS.
+- [ ] Add proactive interaction workflow model.
 
 ## AAS Type / Instance Modeling
 
