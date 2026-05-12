@@ -240,3 +240,9 @@
   - Validation reruns immediately after edits and updates Explorer/Dashboard state
   - Issue cards offer quick fixes for common reference, whitespace, semanticId and unit warnings
   - Inspector offers contextual correction suggestions for selected nodes
+- Added runtime capability checks for AAS operating types:
+  - Type 2 reactive AAS validation checks for documented runtime endpoints, services or GatewayMapping descriptors
+  - Type 2 reactive AAS validation checks for dynamic data/service access descriptors
+  - Type 3 proactive AAS validation checks for communication endpoints
+  - Type 3 proactive AAS validation checks for autonomous interaction elements like Operation, BasicEventElement or Capability
+  - TODO now points to endpoint/service descriptor guidance as the next operating-type task

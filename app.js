@@ -1822,7 +1822,8 @@ function getAasTypeReferences(shell = {}) {
 }
 
 function getAasRuntimeType(shell = {}) {
-  const extension = (shell.extensions ?? []).find((candidate) => candidate?.name === "AasRuntimeType");
+  const extensions = Array.isArray(shell.extensions) ? shell.extensions : [];
+  const extension = extensions.find((candidate) => candidate?.name === "AasRuntimeType");
   return normalizeAasRuntimeType(extension?.value);
 }
 
@@ -3336,6 +3337,7 @@ function validateAasPackage(aasPackage) {
       referenceContext,
       skipLocalTargetWarning: true,
     });
+    validateAasRuntimeCapabilities(shell, path, issues, { referenceContext });
 
     if (shell.submodels !== undefined && !Array.isArray(shell.submodels)) {
       issues.push(errorIssue(`${path}.submodels`, "Submodel-Referenzen muessen ein Array sein."));
@@ -3400,6 +3402,152 @@ function validateAasPackage(aasPackage) {
       elements: elementCount,
     },
   };
+}
+
+function validateAasRuntimeCapabilities(shell, path, issues, options = {}) {
+  const runtimeType = getAasRuntimeType(shell);
+  if (runtimeType === "Type1Passive") return;
+
+  const submodels = getShellReferencedSubmodels(shell, options.referenceContext);
+  const capabilities = collectAasRuntimeCapabilities(shell, submodels);
+  const runtimeLabel = formatAasRuntimeType(runtimeType);
+
+  if (runtimeType === "Type2Reactive") {
+    if (!capabilities.hasEndpointDescriptor) {
+      issues.push(
+        warnIssue(
+          path,
+          `${runtimeLabel} braucht einen dokumentierten Laufzeit-Endpunkt, Service-Descriptor oder Gateway-Mapping.`,
+          "interoperability",
+        ),
+      );
+    }
+
+    if (!capabilities.hasDynamicAccess) {
+      issues.push(
+        warnIssue(
+          path,
+          `${runtimeLabel} sollte dynamische Daten oder Dienste ueber GatewayMapping, Operationen oder OperationalData sichtbar machen.`,
+          "interoperability",
+        ),
+      );
+    }
+  }
+
+  if (runtimeType === "Type3Proactive") {
+    if (!capabilities.hasEndpointDescriptor) {
+      issues.push(
+        warnIssue(
+          path,
+          `${runtimeLabel} braucht einen Kommunikations- oder Service-Endpunkt fuer die autonome Interaktion.`,
+          "interoperability",
+        ),
+      );
+    }
+
+    if (!capabilities.hasAutonomousInteraction) {
+      issues.push(
+        warnIssue(
+          path,
+          `${runtimeLabel} braucht mindestens eine Operation, ein BasicEventElement oder eine Capability als Interaktionsmodell.`,
+          "interoperability",
+        ),
+      );
+    }
+  }
+}
+
+function getShellReferencedSubmodels(shell, referenceContext) {
+  if (!referenceContext) return [];
+  const references = Array.isArray(shell.submodels) ? shell.submodels : [];
+  return references
+    .map((reference) => {
+      const keys = Array.isArray(reference?.keys) ? reference.keys : [];
+      return keys.at(-1)?.value;
+    })
+    .filter(Boolean)
+    .map((submodelId) => referenceContext.submodelsById.get(submodelId))
+    .filter(Boolean);
+}
+
+function collectAasRuntimeCapabilities(shell, submodels) {
+  const capabilities = {
+    endpointDescriptors: new Set(),
+    dynamicDescriptors: new Set(),
+    operationCount: 0,
+    eventCount: 0,
+    capabilityCount: 0,
+  };
+  const visited = new Set();
+  [shell, ...submodels].forEach((entity) => collectRuntimeCapabilitiesFromEntity(entity, capabilities, visited));
+
+  return {
+    hasEndpointDescriptor: capabilities.endpointDescriptors.size > 0,
+    hasDynamicAccess:
+      capabilities.dynamicDescriptors.size > 0 ||
+      capabilities.operationCount > 0 ||
+      capabilities.eventCount > 0 ||
+      capabilities.capabilityCount > 0,
+    hasAutonomousInteraction:
+      capabilities.operationCount > 0 ||
+      capabilities.eventCount > 0 ||
+      capabilities.capabilityCount > 0,
+  };
+}
+
+function collectRuntimeCapabilitiesFromEntity(entity, capabilities, visited, parentKey = "") {
+  if (!entity || typeof entity !== "object" || visited.has(entity)) return;
+  visited.add(entity);
+
+  if (Array.isArray(entity)) {
+    entity.forEach((item) => collectRuntimeCapabilitiesFromEntity(item, capabilities, visited, parentKey));
+    return;
+  }
+
+  const modelType = entity.modelType;
+  if (modelType === "Operation") capabilities.operationCount += 1;
+  if (modelType === "BasicEventElement") capabilities.eventCount += 1;
+  if (modelType === "Capability") capabilities.capabilityCount += 1;
+
+  const descriptorText = normalizeSearchText([
+    parentKey,
+    entity.idShort,
+    entity.id,
+    modelType,
+    ...getReferenceValues(entity.semanticId),
+  ]);
+  const isRuntimeTypeExtension = entity.name === "AasRuntimeType";
+  if (looksLikeRuntimeDescriptor(descriptorText)) {
+    capabilities.dynamicDescriptors.add(descriptorText);
+  }
+
+  for (const [key, value] of Object.entries(entity)) {
+    if (typeof value === "string") {
+      const keyText = normalizeSearchText([key, entity.idShort]);
+      if (looksLikeRuntimeEndpoint(value) || (looksLikeEndpointDescriptor(keyText) && value.trim())) {
+        capabilities.endpointDescriptors.add(value.trim());
+      }
+      if (!isRuntimeTypeExtension && looksLikeRuntimeDescriptor(`${keyText} ${normalizeSearchText([value])}`)) {
+        capabilities.dynamicDescriptors.add(`${keyText}:${value}`);
+      }
+    } else if (value && typeof value === "object") {
+      collectRuntimeCapabilitiesFromEntity(value, capabilities, visited, key);
+    }
+  }
+}
+
+function looksLikeRuntimeEndpoint(value) {
+  return /^(https?:\/\/|opc\.tcp:\/\/|mqtts?:\/\/|wss?:\/\/)/i.test(String(value ?? "").trim());
+}
+
+function looksLikeEndpointDescriptor(text) {
+  return /\b(endpoint|broker|url|uri|api|service|schnittstelle|gateway)\b/.test(text);
+}
+
+function looksLikeRuntimeDescriptor(text) {
+  return /\b(gateway|runtime|operational|telemetry|diagnostic|diagnose|status|sensor|service|endpoint|api|mqtt|opc|event|operation|capability)\b/.test(
+    text,
+  );
 }
 
 function createSemanticContext(conceptDescriptions) {

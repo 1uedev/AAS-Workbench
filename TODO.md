@@ -4,11 +4,10 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add runtime capability checks for Type 2/3 AAS.
+- [ ] Add endpoint/service descriptor guidance for reactive AAS.
 
 ## AAS Operating Types
 
-- [ ] Add runtime capability checks for Type 2/3 AAS.
 - [ ] Add endpoint/service descriptor guidance for reactive AAS.
 - [ ] Add proactive interaction workflow model.
 
