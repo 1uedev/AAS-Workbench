@@ -173,6 +173,15 @@
               <span>Type-AAS Referenz</span>
               <input name="typeAasId" placeholder="urn:example:type:Pump-Series-A:aas" />
             </label>
+            <div class="type-picker-field">
+              <label class="field">
+                <span>Repository Type-AAS</span>
+                <select id="typeAasPicker">
+                  <option value="">Repository laden</option>
+                </select>
+              </label>
+              <button id="refreshTypeAasPickerButton" class="secondary-button" type="button">Aktualisieren</button>
+            </div>
           </div>
           <div id="runtimeDescriptorPanel" class="runtime-descriptor-panel" hidden>
             <div class="form-section-title">Laufzeit-Descriptor</div>

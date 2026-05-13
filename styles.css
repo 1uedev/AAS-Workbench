@@ -526,6 +526,17 @@ body[data-route="dashboard"] .app-shell {
   gap: 12px;
 }
 
+.type-picker-field {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.type-picker-field button {
+  min-height: 40px;
+}
+
 .field {
   display: grid;
   gap: 6px;

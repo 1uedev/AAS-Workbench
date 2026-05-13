@@ -264,3 +264,9 @@
   - All visible and hidden proposals can be applied in one action without overwriting existing instance data
   - Applied proposals load a local synced AAS and prepare a repository change reason for the next save
   - TODO now points to the Repository picker for Type-AAS references in the Generator
+- Added Repository picker for Type-AAS references in the Generator:
+  - Generator lists saved Type-AAS entries from the Repository
+  - Selecting a Type-AAS writes its AAS ID into the existing Type-AAS reference field
+  - Picker stays in sync after Repository refresh or save operations
+  - Generator preview reflects picked Type-AAS references immediately
+  - TODO now continues with Semantic Mapper work

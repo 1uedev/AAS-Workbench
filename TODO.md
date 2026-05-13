@@ -4,11 +4,7 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add Repository picker for Type-AAS reference in the Generator.
-
-## AAS Type / Instance Modeling
-
-- [ ] Add Repository picker for Type-AAS reference in the Generator.
+- [ ] Add semantic ID suggestions.
 
 ## AAS Semantic Mapper
 

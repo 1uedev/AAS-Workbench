@@ -46,6 +46,8 @@ const submodelTemplateSelect = document.querySelector("#submodelTemplateSelect")
 const addTemplateButton = document.querySelector("#addTemplateButton");
 const templatePreview = document.querySelector("#templatePreview");
 const generatorPreview = document.querySelector("#generatorPreview");
+const typeAasPicker = document.querySelector("#typeAasPicker");
+const refreshTypeAasPickerButton = document.querySelector("#refreshTypeAasPickerButton");
 const runtimeDescriptorPanel = document.querySelector("#runtimeDescriptorPanel");
 const runtimeGuidance = document.querySelector("#runtimeGuidance");
 const proactiveWorkflowPanel = document.querySelector("#proactiveWorkflowPanel");
@@ -524,6 +526,7 @@ addSubmodelEditor({
   ],
 });
 renderTemplatePreview();
+renderTypeAasPicker();
 renderGeneratorPreview();
 refreshDashboardCatalog();
 renderDashboard();
@@ -846,6 +849,19 @@ submodelTemplateSelect.addEventListener("change", renderTemplatePreview);
 manualGeneratorForm.addEventListener("input", renderGeneratorPreview);
 manualGeneratorForm.addEventListener("change", renderGeneratorPreview);
 
+typeAasPicker.addEventListener("change", () => {
+  const selectedTypeAasId = typeAasPicker.value;
+  if (selectedTypeAasId) {
+    manualGeneratorForm.elements.typeAasId.value = selectedTypeAasId;
+  }
+  renderGeneratorPreview();
+});
+
+refreshTypeAasPickerButton.addEventListener("click", async () => {
+  await refreshRepository();
+  renderTypeAasPicker();
+});
+
 submodelBuilder.addEventListener("click", (event) => {
   const addPropertyButton = event.target.closest("[data-action='add-property']");
   if (addPropertyButton) {
@@ -1010,6 +1026,43 @@ function renderTemplatePreview() {
   `;
 }
 
+function renderTypeAasPicker() {
+  const selectedTypeAasId = String(manualGeneratorForm.elements.typeAasId?.value ?? "").trim();
+  const options = getRepositoryTypeAasOptions();
+  typeAasPicker.innerHTML = `
+    <option value="">${options.length ? "Type-AAS aus Repository waehlen" : "Keine Type-AAS geladen"}</option>
+    ${options
+      .map((option) => {
+        const selected = option.value === selectedTypeAasId ? " selected" : "";
+        return `<option value="${escapeHtml(option.value)}"${selected}>${escapeHtml(option.label)}</option>`;
+      })
+      .join("")}
+  `;
+}
+
+function syncTypeAasPickerSelection(typeAasId) {
+  const hasOption = [...typeAasPicker.options].some((option) => option.value === typeAasId);
+  typeAasPicker.value = hasOption ? typeAasId : "";
+}
+
+function getRepositoryTypeAasOptions() {
+  return repositoryAssets
+    .filter((asset) => {
+      const searchIndex = asset.searchIndex ?? buildRepositorySearchIndex(asset, asset.latestPayload);
+      return searchIndex.assetKind === "Type";
+    })
+    .map((asset) => {
+      const shell = getPrimaryShell(asset.latestPayload);
+      const referenceId = shell?.id || asset.globalAssetId;
+      return {
+        value: referenceId,
+        label: `${asset.idShort || "Type-AAS"} | ${referenceId}`,
+      };
+    })
+    .filter((option) => option.value)
+    .sort((left, right) => left.label.localeCompare(right.label, "de"));
+}
+
 function renderGeneratorPreview() {
   const formData = new FormData(manualGeneratorForm);
   const assetId = String(formData.get("assetId") ?? "").trim();
@@ -1017,6 +1070,7 @@ function renderGeneratorPreview() {
   const assetKind = normalizeGeneratorAssetKind(formData.get("assetKind"));
   const runtimeType = normalizeAasRuntimeType(formData.get("runtimeType"));
   const typeAasId = String(formData.get("typeAasId") ?? "").trim();
+  syncTypeAasPickerSelection(typeAasId);
   const runtimeDescriptor = getGeneratorRuntimeDescriptor(formData);
   const proactiveWorkflow = getGeneratorProactiveWorkflow(formData);
   const submodels = [...submodelBuilder.querySelectorAll(".submodel-editor")].map((submodelEditor) => {
@@ -1874,6 +1928,7 @@ async function refreshRepository() {
     repositoryStatus.textContent = "Repository wird geladen ...";
     const response = await fetch("/api/aas", { headers: repositoryHeaders() });
     repositoryAssets = annotateTypeRelations(await enrichRepositoryAssets(await readApiResponse(response)));
+    renderTypeAasPicker();
     renderFilteredRepositoryList();
     if (selectedRepositoryEventAssetId && repositoryAssets.some((asset) => asset.id === selectedRepositoryEventAssetId)) {
       await loadRepositoryEvents(selectedRepositoryEventAssetId, { silent: true });
