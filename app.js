@@ -786,6 +786,20 @@ dashboardGrid.addEventListener("click", (event) => {
 });
 
 repositoryList.addEventListener("click", async (event) => {
+  const typeSyncButton = event.target.closest("[data-action^='apply-type-sync']");
+  if (typeSyncButton) {
+    try {
+      applyTypeSyncProposal(
+        typeSyncButton.dataset.assetId,
+        typeSyncButton.dataset.action,
+        typeSyncButton.dataset.syncPath ?? "",
+      );
+    } catch (error) {
+      repositoryStatus.textContent = `Type-Abgleich konnte nicht angewendet werden: ${error.message}`;
+    }
+    return;
+  }
+
   const loadVersionButton = event.target.closest("[data-action='load-version']");
   if (loadVersionButton) {
     await loadRepositoryVersion(loadVersionButton.dataset.assetId, loadVersionButton.dataset.version);
@@ -2038,6 +2052,7 @@ function annotateTypeRelations(assets) {
       typeRelation: typeAsset
         ? {
             status: "linked",
+            typeAssetId: typeAsset.id,
             typeAasId,
             typeAssetIdShort: typeAsset.idShort,
             conformance: compareTypeToInstance(typeAsset.latestPayload, asset.latestPayload),
@@ -2374,8 +2389,138 @@ function renderTypeRelation(asset) {
           ? "Instanz deckt die erwartete Type-Struktur ab."
           : `${missingSubmodels.length} Submodel und ${missingElements.length} Properties fehlen.${missingPreview ? ` (${escapeHtml(missingPreview)})` : ""}`
       }</span>
+      ${renderTypeSyncProposals(asset, missingSubmodels, missingElements)}
     </div>
   `;
+}
+
+function renderTypeSyncProposals(asset, missingSubmodels, missingElements) {
+  if (missingSubmodels.length === 0 && missingElements.length === 0) return "";
+  const proposalLimit = 4;
+  const submodelButtons = missingSubmodels.slice(0, proposalLimit).map((submodelIdShort) => {
+    return `<button class="secondary-button" type="button" data-action="apply-type-sync-submodel" data-asset-id="${escapeHtml(asset.id)}" data-sync-path="${escapeHtml(submodelIdShort)}">Submodel ${escapeHtml(submodelIdShort)} uebernehmen</button>`;
+  });
+  const elementButtons = missingElements.slice(0, proposalLimit).map((elementPath) => {
+    return `<button class="secondary-button" type="button" data-action="apply-type-sync-element" data-asset-id="${escapeHtml(asset.id)}" data-sync-path="${escapeHtml(elementPath)}">Element ${escapeHtml(elementPath)} uebernehmen</button>`;
+  });
+  const hiddenCount = Math.max(0, missingSubmodels.length + missingElements.length - submodelButtons.length - elementButtons.length);
+
+  return `
+    <div class="type-sync-proposals">
+      <div class="type-sync-actions">
+        <button class="primary-button" type="button" data-action="apply-type-sync-all" data-asset-id="${escapeHtml(asset.id)}">Alle Vorschlaege anwenden</button>
+        ${[...submodelButtons, ...elementButtons].join("")}
+      </div>
+      ${hiddenCount ? `<span>${hiddenCount} weitere Vorschlaege werden ueber "Alle Vorschlaege anwenden" uebernommen.</span>` : ""}
+    </div>
+  `;
+}
+
+function applyTypeSyncProposal(assetId, action, syncPath) {
+  const asset = repositoryAssets.find((candidate) => candidate.id === assetId);
+  if (!asset?.latestPayload) throw new Error("Instanz-AAS wurde im Repository nicht gefunden.");
+  const relation = asset.typeRelation;
+  if (relation?.status !== "linked") throw new Error("Keine verknuepfte Type-AAS vorhanden.");
+
+  const typeAsset = repositoryAssets.find((candidate) => candidate.id === relation.typeAssetId);
+  if (!typeAsset?.latestPayload) throw new Error("Type-AAS Payload konnte nicht geladen werden.");
+
+  const syncedPackage = structuredClone(asset.latestPayload);
+  const conformance = compareTypeToInstance(typeAsset.latestPayload, syncedPackage);
+  let appliedCount = 0;
+
+  if (action === "apply-type-sync-all" || action === "apply-type-sync-submodel") {
+    const submodelsToApply = action === "apply-type-sync-all" ? conformance.missingSubmodels : [syncPath];
+    submodelsToApply.forEach((submodelIdShort) => {
+      if (applyTypeSubmodelProposal(typeAsset.latestPayload, syncedPackage, submodelIdShort)) appliedCount += 1;
+    });
+  }
+
+  if (action === "apply-type-sync-all" || action === "apply-type-sync-element") {
+    const elementsToApply = action === "apply-type-sync-all" ? conformance.missingElements : [syncPath];
+    elementsToApply.forEach((elementPath) => {
+      if (applyTypeElementProposal(typeAsset.latestPayload, syncedPackage, elementPath)) appliedCount += 1;
+    });
+  }
+
+  if (appliedCount === 0) throw new Error("Kein passender Vorschlag gefunden.");
+
+  currentFileName = toIdShort(asset.idShort || asset.globalAssetId || "type-synced-aas").toLowerCase();
+  repositoryReason.value = `Type sync from ${relation.typeAssetIdShort || relation.typeAasId}`;
+  loadPackage(syncedPackage);
+  repositoryStatus.textContent = `${appliedCount} Type-Abgleich-Vorschlag${appliedCount === 1 ? "" : "e"} lokal angewendet. Speichere die AAS, um eine neue Repository-Version zu erzeugen.`;
+  navigateTo("explorer");
+}
+
+function applyTypeSubmodelProposal(typePackage, instancePackage, submodelIdShort) {
+  const typeSubmodel = indexSubmodelsByIdShort(typePackage).get(submodelIdShort);
+  if (!typeSubmodel) return false;
+  const instanceSubmodels = indexSubmodelsByIdShort(instancePackage);
+  if (instanceSubmodels.has(submodelIdShort)) return false;
+
+  const shell = getPrimaryShell(instancePackage);
+  if (!shell) return false;
+  const newSubmodel = structuredClone(typeSubmodel);
+  const assetId = shell.assetInformation?.globalAssetId || shell.id || "asset";
+  newSubmodel.id = `${assetId}:submodel:${toIdShort(newSubmodel.idShort || submodelIdShort)}`;
+  instancePackage.submodels = Array.isArray(instancePackage.submodels) ? instancePackage.submodels : [];
+  instancePackage.submodels.push(newSubmodel);
+  shell.submodels = Array.isArray(shell.submodels) ? shell.submodels : [];
+  if (!shell.submodels.some((reference) => reference.keys?.at(-1)?.value === newSubmodel.id)) {
+    shell.submodels.push(referenceTo("Submodel", newSubmodel.id));
+  }
+  return true;
+}
+
+function applyTypeElementProposal(typePackage, instancePackage, elementPath) {
+  const [submodelIdShort, ...elementPathParts] = String(elementPath).split("/").filter(Boolean);
+  if (!submodelIdShort || elementPathParts.length === 0) return false;
+
+  const typeSubmodel = indexSubmodelsByIdShort(typePackage).get(submodelIdShort);
+  const instanceSubmodel = indexSubmodelsByIdShort(instancePackage).get(submodelIdShort);
+  if (!typeSubmodel || !instanceSubmodel) return false;
+
+  const typeElement = findElementByIdShortPath(typeSubmodel, elementPathParts);
+  if (!typeElement) return false;
+  if (findElementByIdShortPath(instanceSubmodel, elementPathParts)) return false;
+
+  const parent = elementPathParts.length === 1 ? instanceSubmodel : findElementByIdShortPath(instanceSubmodel, elementPathParts.slice(0, -1));
+  const children = getMutableElementChildren(parent);
+  if (!children) return false;
+  children.push(structuredClone(typeElement));
+  return true;
+}
+
+function findElementByIdShortPath(container, pathParts) {
+  let current = container;
+  for (const pathPart of pathParts) {
+    const children = getMutableElementChildren(current);
+    current = children?.find((child) => (child.idShort || child.modelType || "Element") === pathPart);
+    if (!current) return null;
+  }
+  return current;
+}
+
+function getMutableElementChildren(entity) {
+  if (!entity || typeof entity !== "object") return null;
+  if (Array.isArray(entity.submodelElements)) return entity.submodelElements;
+  if (entity.modelType === "Submodel" && entity.submodelElements === undefined) {
+    entity.submodelElements = [];
+    return entity.submodelElements;
+  }
+  if (["SubmodelElementCollection", "SubmodelElementList"].includes(entity.modelType)) {
+    if (!Array.isArray(entity.value)) entity.value = [];
+    return entity.value;
+  }
+  if (entity.modelType === "Entity") {
+    if (!Array.isArray(entity.statements)) entity.statements = [];
+    return entity.statements;
+  }
+  if (entity.modelType === "AnnotatedRelationshipElement") {
+    if (!Array.isArray(entity.annotations)) entity.annotations = [];
+    return entity.annotations;
+  }
+  return null;
 }
 
 function formatSearchPreview(values, emptyLabel) {

@@ -1015,6 +1015,29 @@ body[data-route="dashboard"] .app-shell {
   background: #fff8ea;
 }
 
+.type-sync-proposals {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.type-sync-proposals span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.type-sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.type-sync-actions button {
+  min-height: 32px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
 .repository-meta,
 .version-list {
   color: var(--muted);

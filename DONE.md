@@ -258,3 +258,9 @@
   - Workflow model contains `WorkflowState`, `BasicEventElement`, `Capability` and `Operation`
   - Event observation references the local `WorkflowState` property through a ModelReference
   - TODO now continues with guided Type-to-Instance sync proposals
+- Added guided Type-to-Instance sync proposals:
+  - Repository Type-Abgleich now renders apply buttons for missing Type Submodels and Elements
+  - Single missing Submodels or Elements can be copied into a local Instanz-AAS from the linked Type-AAS
+  - All visible and hidden proposals can be applied in one action without overwriting existing instance data
+  - Applied proposals load a local synced AAS and prepare a repository change reason for the next save
+  - TODO now points to the Repository picker for Type-AAS references in the Generator

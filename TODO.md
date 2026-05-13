@@ -4,11 +4,10 @@ This file only tracks open work. Completed work belongs in `DONE.md`.
 
 ## Next
 
-- [ ] Add guided Type-to-Instance sync proposals.
+- [ ] Add Repository picker for Type-AAS reference in the Generator.
 
 ## AAS Type / Instance Modeling
 
-- [ ] Add guided Type-to-Instance sync proposals.
 - [ ] Add Repository picker for Type-AAS reference in the Generator.
 
 ## AAS Semantic Mapper
