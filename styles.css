@@ -320,6 +320,12 @@ body[data-route="home"] .header-actions {
   padding: 20px clamp(18px, 4vw, 48px) 42px;
 }
 
+body[data-route="generator"] .app-shell {
+  grid-template-columns: minmax(0, 1fr);
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
 body[data-route="explorer"] .app-shell {
   grid-template-columns: minmax(260px, 0.55fr) minmax(720px, 1.45fr);
 }
@@ -592,6 +598,13 @@ body[data-route="dashboard"] .app-shell {
   background: #fbfcfa;
 }
 
+.generator-help {
+  margin: -2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .generator-advanced-panel summary {
   cursor: pointer;
   color: var(--ink);
@@ -760,7 +773,7 @@ body[data-route="dashboard"] .app-shell {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
-  background: #fbfcfa;
+  background: #fff;
 }
 
 .submodel-editor-header,
@@ -784,6 +797,12 @@ body[data-route="dashboard"] .app-shell {
   font-size: 14px;
 }
 
+.submodel-fields {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 12px;
+}
+
 .property-list {
   display: grid;
   gap: 10px;
@@ -796,6 +815,17 @@ body[data-route="dashboard"] .app-shell {
   border-radius: 8px;
   padding: 12px;
   background: #fff;
+}
+
+.property-grid {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(140px, 0.95fr) minmax(130px, 0.75fr) minmax(90px, 0.55fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.property-semantic-field {
+  grid-column: 1 / -1;
 }
 
 .gateway-backend-panel {
@@ -2046,6 +2076,10 @@ body[data-route="dashboard"] .app-shell {
     grid-template-columns: 1fr;
   }
 
+  .property-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+
   .home-workbench {
     min-height: 0;
   }
@@ -2096,7 +2130,9 @@ body[data-route="dashboard"] .app-shell {
 
 @media (max-width: 560px) {
   .stats-grid,
-  .form-grid {
+  .form-grid,
+  .submodel-fields,
+  .property-grid {
     grid-template-columns: 1fr;
   }
 

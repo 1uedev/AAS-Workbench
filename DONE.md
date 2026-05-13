@@ -275,6 +275,10 @@
   - Asset ID can be generated automatically from Asset Name
   - The main flow now starts with an editable Submodel and a single blank Property row
   - Properties can be added one by one without choosing a fixed preset
+  - Generator route now uses the full workspace width instead of a cramped left column
+  - Property rows are more compact and label required versus optional fields
+  - Minimum Submodel/Property remove buttons are disabled instead of doing nothing
+  - Blank added Property rows are ignored during generation, while incomplete filled rows still validate
   - Optional Submodel templates are collapsed and no longer drive the default path
   - Advanced Type/Runtime fields are collapsed by default
   - Generator route focuses on creation, then sends generated AAS packages to Explorer

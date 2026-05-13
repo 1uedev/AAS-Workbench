@@ -865,6 +865,7 @@ submodelBuilder.addEventListener("click", (event) => {
     const propertyList = propertyEditor.closest(".property-list");
     if (propertyList.querySelectorAll(".property-editor").length > 1) {
       propertyEditor.remove();
+      updateGeneratorEditorControls();
       renderGeneratorPreview();
     }
     return;
@@ -873,6 +874,7 @@ submodelBuilder.addEventListener("click", (event) => {
   const removeSubmodelButton = event.target.closest("[data-action='remove-submodel']");
   if (removeSubmodelButton && submodelBuilder.querySelectorAll(".submodel-editor").length > 1) {
     removeSubmodelButton.closest(".submodel-editor").remove();
+    updateGeneratorEditorControls();
     renderGeneratorPreview();
   }
 });
@@ -1274,13 +1276,13 @@ function addSubmodelEditor(seed = {}) {
       <h3>Submodel</h3>
       <button class="secondary-button" type="button" data-action="remove-submodel">Entfernen</button>
     </div>
-    <div class="form-grid">
+    <div class="submodel-fields">
       <label class="field">
-        <span>Submodel ID</span>
+        <span>Submodel ID optional</span>
         <input data-field="submodelId" placeholder="urn:example:submodel:Pump-001:TechnicalData" />
       </label>
       <label class="field">
-        <span>Submodel Name</span>
+        <span>Submodel Name Pflicht</span>
         <input data-field="submodelName" required placeholder="Technical Data" />
       </label>
     </div>
@@ -1297,6 +1299,7 @@ function addSubmodelEditor(seed = {}) {
   const propertyList = submodel.querySelector(".property-list");
   const properties = seed.properties?.length ? seed.properties : [{}];
   properties.forEach((property) => addPropertyEditor(propertyList, property));
+  updateGeneratorEditorControls();
   renderGeneratorPreview();
 }
 
@@ -1308,17 +1311,21 @@ function addPropertyEditor(propertyList, seed = {}) {
   property.dataset.propertyIndex = String(propertyIndex);
   property.innerHTML = `
     <div class="property-editor-header">
-      <h4>Property</h4>
+      <h4>Property ${propertyIndex}</h4>
       <button class="secondary-button" type="button" data-action="remove-property">Entfernen</button>
     </div>
-    <div class="form-grid">
+    <div class="property-grid">
       <label class="field">
-        <span>idShort</span>
-        <input data-field="idShort" required placeholder="NominalPower" />
+        <span>idShort Pflicht</span>
+        <input data-field="idShort" placeholder="NominalPower" />
       </label>
       <label class="field">
-        <span>Value Type</span>
-        <select data-field="valueType" required>
+        <span>Wert Pflicht</span>
+        <input data-field="value" placeholder="7.5" />
+      </label>
+      <label class="field">
+        <span>Datentyp</span>
+        <select data-field="valueType">
           <option value="string">string</option>
           <option value="double">double</option>
           <option value="integer">integer</option>
@@ -1327,16 +1334,12 @@ function addPropertyEditor(propertyList, seed = {}) {
         </select>
       </label>
       <label class="field">
-        <span>Value</span>
-        <input data-field="value" required placeholder="7.5" />
-      </label>
-      <label class="field">
-        <span>Semantic ID</span>
-        <input data-field="semanticId" placeholder="https://admin-shell.io/idta/NominalPower" />
-      </label>
-      <label class="field">
-        <span>Unit</span>
+        <span>Unit optional</span>
         <input data-field="unit" placeholder="kW" />
+      </label>
+      <label class="field property-semantic-field">
+        <span>Semantic ID empfohlen</span>
+        <input data-field="semanticId" placeholder="https://admin-shell.io/idta/NominalPower" />
       </label>
     </div>
   `;
@@ -1347,6 +1350,29 @@ function addPropertyEditor(propertyList, seed = {}) {
   property.querySelector("[data-field='semanticId']").value = seed.semanticId ?? "";
   property.querySelector("[data-field='unit']").value = seed.unit ?? "";
   propertyList.append(property);
+  updateGeneratorEditorControls();
+}
+
+function updateGeneratorEditorControls() {
+  const submodels = [...submodelBuilder.querySelectorAll(".submodel-editor")];
+  const isSingleSubmodel = submodels.length <= 1;
+  submodels.forEach((submodel) => {
+    const removeSubmodelButton = submodel.querySelector("[data-action='remove-submodel']");
+    if (removeSubmodelButton) {
+      removeSubmodelButton.disabled = isSingleSubmodel;
+      removeSubmodelButton.title = isSingleSubmodel ? "Mindestens ein Submodel bleibt erhalten." : "";
+    }
+
+    const properties = [...submodel.querySelectorAll(".property-editor")];
+    const isSingleProperty = properties.length <= 1;
+    properties.forEach((property) => {
+      const removePropertyButton = property.querySelector("[data-action='remove-property']");
+      if (removePropertyButton) {
+        removePropertyButton.disabled = isSingleProperty;
+        removePropertyButton.title = isSingleProperty ? "Mindestens eine Property-Zeile bleibt erhalten." : "";
+      }
+    });
+  });
 }
 
 function buildPackageFromGenerator() {
