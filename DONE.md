@@ -270,3 +270,9 @@
   - Picker stays in sync after Repository refresh or save operations
   - Generator preview reflects picked Type-AAS references immediately
   - TODO now continues with Semantic Mapper work
+- Simplified the AAS generator creation UX:
+  - Generator now starts with a compact three-step quick flow
+  - Asset ID can be generated automatically from Asset Name
+  - Starter cards create common Basis-, Betriebsdaten- und Wartungs-AAS structures
+  - Advanced Type/Runtime fields and detailed Submodel editing are collapsed by default
+  - Generator route focuses on creation, then sends generated AAS packages to Explorer

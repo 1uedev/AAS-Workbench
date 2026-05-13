@@ -144,107 +144,151 @@
           <h2 id="generator-title">AAS manuell erzeugen</h2>
         </div>
         <form id="manualGeneratorForm" class="tool-form">
-          <div class="form-section-title">Asset</div>
-          <div class="form-grid">
-            <label class="field">
-              <span>AAS Art</span>
-              <select name="assetKind">
-                <option value="Instance" selected>Instanz-AAS</option>
-                <option value="Type">Type-AAS</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>AAS Betriebsart</span>
-              <select name="runtimeType">
-                <option value="Type1Passive" selected>Typ 1: Passiv / dateibasiert</option>
-                <option value="Type2Reactive">Typ 2: Reaktiv / serverbasiert</option>
-                <option value="Type3Proactive">Typ 3: Proaktiv / autonom</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>Asset ID</span>
-              <input name="assetId" required placeholder="urn:example:asset:Pump-001" />
-            </label>
-            <label class="field">
-              <span>Asset Name</span>
-              <input name="assetName" required placeholder="Pump 001" />
-            </label>
-            <label class="field">
-              <span>Type-AAS Referenz</span>
-              <input name="typeAasId" placeholder="urn:example:type:Pump-Series-A:aas" />
-            </label>
-            <div class="type-picker-field">
+          <div class="generator-flow" aria-label="AAS Generator Schritte">
+            <div>
+              <span>1</span>
+              <strong>Asset benennen</strong>
+            </div>
+            <div>
+              <span>2</span>
+              <strong>Starter wählen</strong>
+            </div>
+            <div>
+              <span>3</span>
+              <strong>AAS erzeugen</strong>
+            </div>
+          </div>
+
+          <section class="generator-simple-panel" aria-labelledby="generator-basic-title">
+            <div class="form-section-title" id="generator-basic-title">Schnellstart</div>
+            <div class="form-grid">
               <label class="field">
-                <span>Repository Type-AAS</span>
-                <select id="typeAasPicker">
-                  <option value="">Repository laden</option>
+                <span>Asset Name</span>
+                <input name="assetName" required placeholder="Pump 001" />
+              </label>
+              <label class="field">
+                <span>AAS ID</span>
+                <input name="assetId" placeholder="wird aus dem Namen erzeugt" />
+              </label>
+            </div>
+            <div class="generator-starter-grid" aria-label="Starter Vorlagen">
+              <button class="generator-starter-card" type="button" data-generator-preset="basic">
+                <strong>Basis-AAS</strong>
+                <span>Typenschild und technische Grunddaten.</span>
+              </button>
+              <button class="generator-starter-card" type="button" data-generator-preset="machine">
+                <strong>Maschine mit Betriebsdaten</strong>
+                <span>Technische Daten plus Status und Laufzeit.</span>
+              </button>
+              <button class="generator-starter-card" type="button" data-generator-preset="maintenance">
+                <strong>Wartung vorbereiten</strong>
+                <span>Technische Daten plus Maintenance-Submodel.</span>
+              </button>
+            </div>
+          </section>
+
+          <details class="generator-advanced-panel">
+            <summary>Erweiterte AAS-Einstellungen</summary>
+            <div class="form-grid">
+              <label class="field">
+                <span>AAS Art</span>
+                <select name="assetKind">
+                  <option value="Instance" selected>Instanz-AAS</option>
+                  <option value="Type">Type-AAS</option>
                 </select>
               </label>
-              <button id="refreshTypeAasPickerButton" class="secondary-button" type="button">Aktualisieren</button>
+              <label class="field">
+                <span>AAS Betriebsart</span>
+                <select name="runtimeType">
+                  <option value="Type1Passive" selected>Typ 1: Passiv / dateibasiert</option>
+                  <option value="Type2Reactive">Typ 2: Reaktiv / serverbasiert</option>
+                  <option value="Type3Proactive">Typ 3: Proaktiv / autonom</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Type-AAS Referenz</span>
+                <input name="typeAasId" placeholder="urn:example:type:Pump-Series-A:aas" />
+              </label>
+              <div class="type-picker-field">
+                <label class="field">
+                  <span>Repository Type-AAS</span>
+                  <select id="typeAasPicker">
+                    <option value="">Repository laden</option>
+                  </select>
+                </label>
+                <button id="refreshTypeAasPickerButton" class="secondary-button" type="button">Aktualisieren</button>
+              </div>
             </div>
-          </div>
-          <div id="runtimeDescriptorPanel" class="runtime-descriptor-panel" hidden>
-            <div class="form-section-title">Laufzeit-Descriptor</div>
-            <div class="form-grid">
-              <label class="field">
-                <span>Service Endpoint</span>
-                <input name="runtimeEndpoint" placeholder="https://api.example.com/status oder opc.tcp://localhost:4840" />
-              </label>
-              <label class="field">
-                <span>Service Name</span>
-                <input name="runtimeServiceName" placeholder="StatusService" />
-              </label>
-              <label class="field">
-                <span>Source Address</span>
-                <input name="runtimeSourceAddress" placeholder="data.status, ns=2;s=Pump.Status oder factory/pump/status" />
-              </label>
-              <label class="field">
-                <span>Sampling ms</span>
-                <input name="runtimeSamplingInterval" type="number" min="100" step="100" value="1000" />
-              </label>
+            <div id="runtimeDescriptorPanel" class="runtime-descriptor-panel" hidden>
+              <div class="form-section-title">Laufzeit-Descriptor</div>
+              <div class="form-grid">
+                <label class="field">
+                  <span>Service Endpoint</span>
+                  <input name="runtimeEndpoint" placeholder="https://api.example.com/status oder opc.tcp://localhost:4840" />
+                </label>
+                <label class="field">
+                  <span>Service Name</span>
+                  <input name="runtimeServiceName" placeholder="StatusService" />
+                </label>
+                <label class="field">
+                  <span>Source Address</span>
+                  <input name="runtimeSourceAddress" placeholder="data.status, ns=2;s=Pump.Status oder factory/pump/status" />
+                </label>
+                <label class="field">
+                  <span>Sampling ms</span>
+                  <input name="runtimeSamplingInterval" type="number" min="100" step="100" value="1000" />
+                </label>
+              </div>
+              <div id="runtimeGuidance" class="runtime-guidance" aria-live="polite"></div>
             </div>
-            <div id="runtimeGuidance" class="runtime-guidance" aria-live="polite"></div>
-          </div>
-          <div id="proactiveWorkflowPanel" class="proactive-workflow-panel" hidden>
-            <div class="form-section-title">Proaktive Interaktion</div>
-            <div class="form-grid">
-              <label class="field">
-                <span>Workflow Name</span>
-                <input name="proactiveWorkflowName" value="AutonomousMaintenanceWorkflow" />
-              </label>
-              <label class="field">
-                <span>Trigger Event</span>
-                <input name="proactiveTriggerEvent" value="RuntimeStateChanged" />
-              </label>
-              <label class="field">
-                <span>Capability</span>
-                <input name="proactiveCapabilityName" value="AutonomousDecision" />
-              </label>
-              <label class="field">
-                <span>Operation</span>
-                <input name="proactiveOperationName" value="CreateMaintenanceTask" />
-              </label>
+            <div id="proactiveWorkflowPanel" class="proactive-workflow-panel" hidden>
+              <div class="form-section-title">Proaktive Interaktion</div>
+              <div class="form-grid">
+                <label class="field">
+                  <span>Workflow Name</span>
+                  <input name="proactiveWorkflowName" value="AutonomousMaintenanceWorkflow" />
+                </label>
+                <label class="field">
+                  <span>Trigger Event</span>
+                  <input name="proactiveTriggerEvent" value="RuntimeStateChanged" />
+                </label>
+                <label class="field">
+                  <span>Capability</span>
+                  <input name="proactiveCapabilityName" value="AutonomousDecision" />
+                </label>
+                <label class="field">
+                  <span>Operation</span>
+                  <input name="proactiveOperationName" value="CreateMaintenanceTask" />
+                </label>
+              </div>
+              <div id="proactiveWorkflowGuidance" class="runtime-guidance" aria-live="polite"></div>
             </div>
-            <div id="proactiveWorkflowGuidance" class="runtime-guidance" aria-live="polite"></div>
-          </div>
-          <div class="generator-template-panel">
-            <div class="form-section-title">Submodel Templates</div>
-            <div class="template-controls">
-              <label class="field">
-                <span>Template</span>
-                <select id="submodelTemplateSelect"></select>
-              </label>
-              <button class="secondary-button" id="addTemplateButton" type="button">Template hinzufügen</button>
+          </details>
+
+          <details class="generator-advanced-panel">
+            <summary>Submodels und Werte bearbeiten</summary>
+            <div class="generator-template-panel">
+              <div class="form-section-title">Submodel Templates</div>
+              <div class="template-controls">
+                <label class="field">
+                  <span>Template</span>
+                  <select id="submodelTemplateSelect"></select>
+                </label>
+                <button class="secondary-button" id="addTemplateButton" type="button">Template hinzufügen</button>
+              </div>
+              <div id="templatePreview" class="template-preview" aria-live="polite"></div>
             </div>
-            <div id="templatePreview" class="template-preview" aria-live="polite"></div>
-          </div>
-          <div class="submodel-builder" id="submodelBuilder"></div>
+            <div class="submodel-builder" id="submodelBuilder"></div>
+            <div class="action-row">
+              <button class="secondary-button" id="addSubmodelButton" type="button">Submodel hinzufügen</button>
+            </div>
+          </details>
+
           <div class="generator-preview-panel">
-            <div class="form-section-title">Vorschau vor Erzeugung</div>
+            <div class="form-section-title">Was erzeugt wird</div>
             <div id="generatorPreview" class="generator-preview" aria-live="polite"></div>
           </div>
           <div class="action-row">
-            <button class="secondary-button" id="addSubmodelButton" type="button">Submodel hinzufügen</button>
             <button class="primary-button" type="submit">AAS erzeugen</button>
           </div>
         </form>

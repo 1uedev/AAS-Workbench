@@ -46,6 +46,7 @@ const submodelTemplateSelect = document.querySelector("#submodelTemplateSelect")
 const addTemplateButton = document.querySelector("#addTemplateButton");
 const templatePreview = document.querySelector("#templatePreview");
 const generatorPreview = document.querySelector("#generatorPreview");
+const generatorPresetButtons = [...document.querySelectorAll("[data-generator-preset]")];
 const typeAasPicker = document.querySelector("#typeAasPicker");
 const refreshTypeAasPickerButton = document.querySelector("#refreshTypeAasPickerButton");
 const runtimeDescriptorPanel = document.querySelector("#runtimeDescriptorPanel");
@@ -509,22 +510,23 @@ const submodelTemplates = [
   },
 ];
 
+const generatorPresets = {
+  basic: {
+    templateKeys: ["technicalData"],
+  },
+  machine: {
+    templateKeys: ["technicalData", "operationalData"],
+  },
+  maintenance: {
+    templateKeys: ["technicalData", "maintenance"],
+  },
+};
+
 window.addEventListener("hashchange", applyRoute);
 applyRoute();
 initializeRepositoryAccess();
 renderTemplateOptions();
-addSubmodelEditor({
-  idShort: "TechnicalData",
-  properties: [
-    {
-      idShort: "Manufacturer",
-      valueType: "string",
-      value: "ACME Industrial",
-      semanticId: "https://admin-shell.io/idta/Manufacturer",
-      unit: "",
-    },
-  ],
-});
+applyGeneratorPreset("basic");
 renderTemplatePreview();
 renderTypeAasPicker();
 renderGeneratorPreview();
@@ -845,6 +847,10 @@ addTemplateButton.addEventListener("click", () => {
   addSubmodelEditor(cloneTemplateSeed(template));
 });
 
+generatorPresetButtons.forEach((button) => {
+  button.addEventListener("click", () => applyGeneratorPreset(button.dataset.generatorPreset));
+});
+
 submodelTemplateSelect.addEventListener("change", renderTemplatePreview);
 manualGeneratorForm.addEventListener("input", renderGeneratorPreview);
 manualGeneratorForm.addEventListener("change", renderGeneratorPreview);
@@ -1006,6 +1012,34 @@ function cloneTemplateSeed(template) {
   };
 }
 
+function getTemplateSeed(templateKey) {
+  const template = submodelTemplates.find((candidate) => candidate.key === templateKey);
+  return template ? cloneTemplateSeed(template) : null;
+}
+
+function applyGeneratorPreset(presetKey) {
+  const preset = generatorPresets[presetKey] ?? generatorPresets.basic;
+  const seeds = preset.templateKeys.map(getTemplateSeed).filter(Boolean);
+  resetSubmodelBuilder(seeds);
+  updateGeneratorPresetSelection(presetKey);
+  renderGeneratorPreview();
+}
+
+function resetSubmodelBuilder(seeds) {
+  submodelBuilder.innerHTML = "";
+  submodelCounter = 1;
+  propertyCounter = 1;
+  (seeds.length ? seeds : [getTemplateSeed("technicalData")]).filter(Boolean).forEach((seed) => addSubmodelEditor(seed));
+}
+
+function updateGeneratorPresetSelection(presetKey) {
+  generatorPresetButtons.forEach((button) => {
+    const selected = button.dataset.generatorPreset === presetKey;
+    button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
+  });
+}
+
 function renderTemplatePreview() {
   const template = getSelectedSubmodelTemplate();
   if (!template) {
@@ -1065,8 +1099,9 @@ function getRepositoryTypeAasOptions() {
 
 function renderGeneratorPreview() {
   const formData = new FormData(manualGeneratorForm);
-  const assetId = String(formData.get("assetId") ?? "").trim();
   const assetName = String(formData.get("assetName") ?? "").trim();
+  const explicitAssetId = String(formData.get("assetId") ?? "").trim();
+  const assetId = explicitAssetId || createGeneratedAssetId(assetName);
   const assetKind = normalizeGeneratorAssetKind(formData.get("assetKind"));
   const runtimeType = normalizeAasRuntimeType(formData.get("runtimeType"));
   const typeAasId = String(formData.get("typeAasId") ?? "").trim();
@@ -1091,7 +1126,8 @@ function renderGeneratorPreview() {
     };
   });
   const propertyCount = submodels.reduce((count, submodel) => count + submodel.properties.length, 0);
-  const assetLabel = assetName || assetId || "Noch kein Asset";
+  const assetLabel = assetName || "Asset Name fehlt noch";
+  const assetIdPreview = explicitAssetId || (assetId ? `${assetId} (automatisch)` : "AAS ID wird aus Name erzeugt");
   const typeRelationText =
     assetKind === "Instance" && typeAasId
       ? ` | referenziert Type-AAS ${typeAasId}`
@@ -1106,7 +1142,7 @@ function renderGeneratorPreview() {
   generatorPreview.innerHTML = `
     <div class="preview-card">
       <h3>${escapeHtml(assetLabel)}</h3>
-      <p>${escapeHtml(assetId || "Asset ID fehlt noch")} | ${escapeHtml(formatAssetKind(assetKind))} | ${escapeHtml(formatAasRuntimeType(runtimeType))} | ${submodels.length} Submodel | ${propertyCount} Properties${escapeHtml(typeRelationText)}</p>
+      <p>${escapeHtml(assetIdPreview)} | ${escapeHtml(formatAssetKind(assetKind))} | ${escapeHtml(formatAasRuntimeType(runtimeType))} | ${submodels.length} Submodel | ${propertyCount} Properties${escapeHtml(typeRelationText)}</p>
     </div>
     ${renderRuntimePreviewCard(runtimeGuidanceState)}
     ${renderProactiveWorkflowPreviewCard(proactiveWorkflowState)}
@@ -1148,6 +1184,11 @@ function getGeneratorProactiveWorkflow(formData = new FormData(manualGeneratorFo
     capabilityName: String(formData.get("proactiveCapabilityName") ?? "").trim() || "AutonomousDecision",
     operationName: String(formData.get("proactiveOperationName") ?? "").trim() || "CreateMaintenanceTask",
   };
+}
+
+function createGeneratedAssetId(assetName) {
+  const name = String(assetName ?? "").trim();
+  return name ? `urn:example:asset:${toIdShort(name)}` : "";
 }
 
 function getRuntimeDescriptorGuidanceState(runtimeType, descriptor) {
@@ -1333,15 +1374,15 @@ function addPropertyEditor(propertyList, seed = {}) {
 
 function buildPackageFromGenerator() {
   const formData = new FormData(manualGeneratorForm);
-  const assetId = String(formData.get("assetId") ?? "").trim();
   const assetName = String(formData.get("assetName") ?? "").trim();
+  const assetId = String(formData.get("assetId") ?? "").trim() || createGeneratedAssetId(assetName);
   const assetKind = normalizeGeneratorAssetKind(formData.get("assetKind"));
   const runtimeType = normalizeAasRuntimeType(formData.get("runtimeType"));
   const typeAasId = String(formData.get("typeAasId") ?? "").trim();
   const runtimeDescriptor = getGeneratorRuntimeDescriptor(formData);
   const proactiveWorkflow = getGeneratorProactiveWorkflow(formData);
-  if (!assetId || !assetName) {
-    throw new Error("Asset ID und Asset Name sind Pflichtfelder.");
+  if (!assetName) {
+    throw new Error("Asset Name ist erforderlich.");
   }
 
   const records = [];
