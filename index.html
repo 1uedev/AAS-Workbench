@@ -151,7 +151,7 @@
             </div>
             <div>
               <span>2</span>
-              <strong>Starter wählen</strong>
+              <strong>Properties erfassen</strong>
             </div>
             <div>
               <span>3</span>
@@ -171,19 +171,13 @@
                 <input name="assetId" placeholder="wird aus dem Namen erzeugt" />
               </label>
             </div>
-            <div class="generator-starter-grid" aria-label="Starter Vorlagen">
-              <button class="generator-starter-card" type="button" data-generator-preset="basic">
-                <strong>Basis-AAS</strong>
-                <span>Typenschild und technische Grunddaten.</span>
-              </button>
-              <button class="generator-starter-card" type="button" data-generator-preset="machine">
-                <strong>Maschine mit Betriebsdaten</strong>
-                <span>Technische Daten plus Status und Laufzeit.</span>
-              </button>
-              <button class="generator-starter-card" type="button" data-generator-preset="maintenance">
-                <strong>Wartung vorbereiten</strong>
-                <span>Technische Daten plus Maintenance-Submodel.</span>
-              </button>
+          </section>
+
+          <section class="generator-builder-panel" aria-labelledby="generator-properties-title">
+            <div class="form-section-title" id="generator-properties-title">Submodel und Properties</div>
+            <div class="submodel-builder" id="submodelBuilder"></div>
+            <div class="action-row">
+              <button class="secondary-button" id="addSubmodelButton" type="button">Submodel hinzufügen</button>
             </div>
           </section>
 
@@ -266,7 +260,7 @@
           </details>
 
           <details class="generator-advanced-panel">
-            <summary>Submodels und Werte bearbeiten</summary>
+            <summary>Optionale Submodel-Templates</summary>
             <div class="generator-template-panel">
               <div class="form-section-title">Submodel Templates</div>
               <div class="template-controls">
@@ -277,10 +271,6 @@
                 <button class="secondary-button" id="addTemplateButton" type="button">Template hinzufügen</button>
               </div>
               <div id="templatePreview" class="template-preview" aria-live="polite"></div>
-            </div>
-            <div class="submodel-builder" id="submodelBuilder"></div>
-            <div class="action-row">
-              <button class="secondary-button" id="addSubmodelButton" type="button">Submodel hinzufügen</button>
             </div>
           </details>
 

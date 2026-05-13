@@ -46,7 +46,6 @@ const submodelTemplateSelect = document.querySelector("#submodelTemplateSelect")
 const addTemplateButton = document.querySelector("#addTemplateButton");
 const templatePreview = document.querySelector("#templatePreview");
 const generatorPreview = document.querySelector("#generatorPreview");
-const generatorPresetButtons = [...document.querySelectorAll("[data-generator-preset]")];
 const typeAasPicker = document.querySelector("#typeAasPicker");
 const refreshTypeAasPickerButton = document.querySelector("#refreshTypeAasPickerButton");
 const runtimeDescriptorPanel = document.querySelector("#runtimeDescriptorPanel");
@@ -510,23 +509,11 @@ const submodelTemplates = [
   },
 ];
 
-const generatorPresets = {
-  basic: {
-    templateKeys: ["technicalData"],
-  },
-  machine: {
-    templateKeys: ["technicalData", "operationalData"],
-  },
-  maintenance: {
-    templateKeys: ["technicalData", "maintenance"],
-  },
-};
-
 window.addEventListener("hashchange", applyRoute);
 applyRoute();
 initializeRepositoryAccess();
 renderTemplateOptions();
-applyGeneratorPreset("basic");
+resetSubmodelBuilder([createManualSubmodelSeed()]);
 renderTemplatePreview();
 renderTypeAasPicker();
 renderGeneratorPreview();
@@ -847,10 +834,6 @@ addTemplateButton.addEventListener("click", () => {
   addSubmodelEditor(cloneTemplateSeed(template));
 });
 
-generatorPresetButtons.forEach((button) => {
-  button.addEventListener("click", () => applyGeneratorPreset(button.dataset.generatorPreset));
-});
-
 submodelTemplateSelect.addEventListener("change", renderTemplatePreview);
 manualGeneratorForm.addEventListener("input", renderGeneratorPreview);
 manualGeneratorForm.addEventListener("change", renderGeneratorPreview);
@@ -1012,32 +995,18 @@ function cloneTemplateSeed(template) {
   };
 }
 
-function getTemplateSeed(templateKey) {
-  const template = submodelTemplates.find((candidate) => candidate.key === templateKey);
-  return template ? cloneTemplateSeed(template) : null;
-}
-
-function applyGeneratorPreset(presetKey) {
-  const preset = generatorPresets[presetKey] ?? generatorPresets.basic;
-  const seeds = preset.templateKeys.map(getTemplateSeed).filter(Boolean);
-  resetSubmodelBuilder(seeds);
-  updateGeneratorPresetSelection(presetKey);
-  renderGeneratorPreview();
+function createManualSubmodelSeed() {
+  return {
+    idShort: "TechnicalData",
+    properties: [{}],
+  };
 }
 
 function resetSubmodelBuilder(seeds) {
   submodelBuilder.innerHTML = "";
   submodelCounter = 1;
   propertyCounter = 1;
-  (seeds.length ? seeds : [getTemplateSeed("technicalData")]).filter(Boolean).forEach((seed) => addSubmodelEditor(seed));
-}
-
-function updateGeneratorPresetSelection(presetKey) {
-  generatorPresetButtons.forEach((button) => {
-    const selected = button.dataset.generatorPreset === presetKey;
-    button.classList.toggle("selected", selected);
-    button.setAttribute("aria-pressed", String(selected));
-  });
+  (seeds.length ? seeds : [createManualSubmodelSeed()]).filter(Boolean).forEach((seed) => addSubmodelEditor(seed));
 }
 
 function renderTemplatePreview() {
@@ -1111,13 +1080,17 @@ function renderGeneratorPreview() {
   const submodels = [...submodelBuilder.querySelectorAll(".submodel-editor")].map((submodelEditor) => {
     const submodelName = submodelEditor.querySelector("[data-field='submodelName']").value.trim();
     const explicitSubmodelId = submodelEditor.querySelector("[data-field='submodelId']").value.trim();
-    const properties = [...submodelEditor.querySelectorAll(".property-editor")].map((propertyEditor) => {
-      return {
-        idShort: propertyEditor.querySelector("[data-field='idShort']").value.trim() || "Property",
-        valueType: propertyEditor.querySelector("[data-field='valueType']").value || "string",
-        value: propertyEditor.querySelector("[data-field='value']").value.trim(),
-      };
-    });
+    const properties = [...submodelEditor.querySelectorAll(".property-editor")]
+      .map((propertyEditor) => {
+        return {
+          idShort: propertyEditor.querySelector("[data-field='idShort']").value.trim(),
+          valueType: propertyEditor.querySelector("[data-field='valueType']").value || "string",
+          value: propertyEditor.querySelector("[data-field='value']").value.trim(),
+          semanticId: propertyEditor.querySelector("[data-field='semanticId']").value.trim(),
+          unit: propertyEditor.querySelector("[data-field='unit']").value.trim(),
+        };
+      })
+      .filter((property) => hasPropertyDraftValue(property));
 
     return {
       id: explicitSubmodelId || (assetId && submodelName ? `${assetId}:submodel:${toIdShort(submodelName)}` : ""),
@@ -1155,7 +1128,7 @@ function renderGeneratorPreview() {
                 return `<span>${escapeHtml(property.idShort)} (${escapeHtml(property.valueType)})${escapeHtml(value)}</span>`;
               })
               .join("")
-          : "<span>Keine Properties</span>";
+          : "<span>Noch keine Properties</span>";
         return `
           <div class="preview-card">
             <h4>${escapeHtml(submodel.name)}</h4>
@@ -1189,6 +1162,10 @@ function getGeneratorProactiveWorkflow(formData = new FormData(manualGeneratorFo
 function createGeneratedAssetId(assetName) {
   const name = String(assetName ?? "").trim();
   return name ? `urn:example:asset:${toIdShort(name)}` : "";
+}
+
+function hasPropertyDraftValue(property) {
+  return Boolean(property.idShort || property.value || property.semanticId || property.unit);
 }
 
 function getRuntimeDescriptorGuidanceState(runtimeType, descriptor) {
@@ -1406,6 +1383,10 @@ function buildPackageFromGenerator() {
         semanticId: propertyEditor.querySelector("[data-field='semanticId']").value.trim(),
         unit: propertyEditor.querySelector("[data-field='unit']").value.trim(),
       };
+
+      if (!hasPropertyDraftValue(record)) {
+        continue;
+      }
 
       if (!record.idShort || !record.value) {
         throw new Error(`Submodel ${submodelName} enthaelt eine unvollstaendige Property.`);

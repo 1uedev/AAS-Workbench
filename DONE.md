@@ -273,6 +273,8 @@
 - Simplified the AAS generator creation UX:
   - Generator now starts with a compact three-step quick flow
   - Asset ID can be generated automatically from Asset Name
-  - Starter cards create common Basis-, Betriebsdaten- und Wartungs-AAS structures
-  - Advanced Type/Runtime fields and detailed Submodel editing are collapsed by default
+  - The main flow now starts with an editable Submodel and a single blank Property row
+  - Properties can be added one by one without choosing a fixed preset
+  - Optional Submodel templates are collapsed and no longer drive the default path
+  - Advanced Type/Runtime fields are collapsed by default
   - Generator route focuses on creation, then sends generated AAS packages to Explorer
